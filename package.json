@@ -19,13 +19,19 @@
   "scripts": {
     "build": "npm run build --workspaces",
     "dev": "npm run dev --workspaces",
-    "test": "npm run test --workspaces"
+    "test": "npm run test --workspaces",
+    "lint": "eslint packages/*/src/**/*.ts",
+    "lint:fix": "eslint packages/*/src/**/*.ts --fix"
   },
   "devDependencies": {
+    "@eslint/js": "^9.30.0",
+    "@typescript-eslint/eslint-plugin": "^6.21.0",
+    "@typescript-eslint/parser": "^6.21.0",
+    "eslint": "^8.57.1",
+    "eslint-plugin-react": "^7.37.5",
+    "globals": "^16.2.0",
     "typescript": "^5.1.6",
-    "@typescript-eslint/eslint-plugin": "^6.0.0",
-    "@typescript-eslint/parser": "^6.0.0",
-    "eslint": "^8.45.0"
+    "typescript-eslint": "^8.35.1"
   },
   "keywords": [
     "voice-ai",
