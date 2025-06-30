@@ -2,7 +2,7 @@
   "name": "voice-ai-workforce-demo",
   "version": "1.0.0",
   "type": "module",
-  "private": true,
+  "private": false,
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
