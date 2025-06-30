@@ -10,7 +10,7 @@
   "bugs": {
     "url": "https://github.com/devvenueboost/voice-ai-workforce/issues"
   },
-  "private": false,
+  "private": true,
   "workspaces": [
     "packages/*",
     "examples/*"
