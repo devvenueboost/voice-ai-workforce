@@ -9,8 +9,6 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@voice-ai-workforce/core": "workspace:*",
-    "@voice-ai-workforce/react": "workspace:*",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },

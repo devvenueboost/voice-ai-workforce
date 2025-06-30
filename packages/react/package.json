@@ -9,10 +9,6 @@
     "dev": "tsc --watch",
     "test": "echo \"React tests here\""
   },
-  "dependencies": {
-    "@voice-ai-workforce/core": "workspace:*",
-    "@voice-ai-workforce/types": "workspace:*"
-  },
   "devDependencies": {
     "typescript": "^5.1.6",
     "@types/react": "^18.2.15"
