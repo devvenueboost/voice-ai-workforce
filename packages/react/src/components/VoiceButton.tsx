@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useVoiceAI } from '../hooks/useVoiceAI';
-import { VoiceCommand, VoiceResponse, VoiceAIConfig } from '../../../types/src/types';
+import { VoiceCommand, VoiceResponse, VoiceAIConfig, VoiceAIError } from '@voice-ai-workforce/types';
 
 // Button size variants
 export type VoiceButtonSize = 'sm' | 'md' | 'lg' | 'xl';
@@ -24,7 +24,8 @@ export interface VoiceButtonProps {
   // Event handlers
   onCommand?: (command: VoiceCommand) => void;
   onResponse?: (response: VoiceResponse) => void;
-  onError?: (error: string) => void;
+  onError?: (error: VoiceAIError) => void;
+
   
   // Custom content
   children?: React.ReactNode;
@@ -141,8 +142,12 @@ export const VoiceButton: React.FC<VoiceButtonProps> = ({
         await startListening();
       }
     } catch (err) {
-      onError?.(err instanceof Error ? err.message : 'Voice operation failed');
-    }
+        onError?.({
+          code: 'VOICE_OPERATION_FAILED',
+          message: err instanceof Error ? err.message : 'Voice operation failed',
+          details: err
+        });
+      }
   };
 
   // Determine button state

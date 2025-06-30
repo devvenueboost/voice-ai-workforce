@@ -4,8 +4,8 @@
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "skipLibCheck": true,
-    "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
+    "moduleResolution": "node",
+    "allowSyntheticDefaultImports": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
@@ -13,12 +13,19 @@
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+    "esModuleInterop": true,
+    "baseUrl": ".",
+    "paths": {
+      "@voice-ai-workforce/types": ["./packages/types/src"],
+      "@voice-ai-workforce/core": ["./packages/core/src"],
+      "@voice-ai-workforce/react": ["./packages/react/src"]
+    }
   },
   "include": ["packages/*/src/**/*", "examples/*/src/**/*", "playground/src/**/*"],
   "references": [
+    { "path": "./packages/types" },
     { "path": "./packages/core" },
-    { "path": "./packages/react" },
-    { "path": "./packages/types" }
+    { "path": "./packages/react" }
   ]
 }

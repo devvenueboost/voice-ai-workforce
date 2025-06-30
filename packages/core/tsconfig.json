@@ -4,10 +4,22 @@
     "module": "CommonJS",
     "declaration": true,
     "outDir": "dist",
+    "rootDir": "src",
     "strict": true,
     "esModuleInterop": true,
-    "skipLibCheck": true
+    "allowSyntheticDefaultImports": true,
+    "skipLibCheck": true,
+    "composite": true,
+    "noEmit": false,
+    "moduleResolution": "node",
+    "baseUrl": ".",
+    "paths": {
+      "@voice-ai-workforce/types": ["../types/src"]
+    }
   },
   "include": ["src/**/*"],
-  "exclude": ["dist", "node_modules"]
+  "exclude": ["dist", "node_modules", "**/*.test.ts", "**/__tests__/**/*"],
+  "references": [
+    { "path": "../types" }
+  ]
 }

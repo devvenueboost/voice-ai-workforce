@@ -1,8 +1,6 @@
 
 // packages/react/src/index.ts
 
-// Export hooks
-export * from './hooks';
-
-// Re-export core types for convenience
-export * from '../../types/src/types';
+export * from './components/VoiceButton';
+export * from './hooks/useVoiceAI';
+export * from '@voice-ai-workforce/types';
