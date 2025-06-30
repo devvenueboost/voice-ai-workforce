@@ -1,0 +1,39 @@
+{
+  "name": "voice-ai-workforce",
+  "version": "1.0.0",
+  "description": "Voice AI assistant for workforce management - hands-free task updates, time tracking, and team communication. Built by VenueBoost Inc.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/devvenueboost/voice-ai-workforce.git"
+  },
+  "homepage": "https://github.com/devvenueboost/voice-ai-workforce#readme",
+  "bugs": {
+    "url": "https://github.com/devvenueboost/voice-ai-workforce/issues"
+  },
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "examples/*",
+    "playground"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "dev": "npm run dev --workspaces",
+    "test": "npm run test --workspaces"
+  },
+  "devDependencies": {
+    "typescript": "^5.1.6",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.45.0"
+  },
+  "keywords": [
+    "voice-ai",
+    "workforce-management",
+    "speech-recognition",
+    "react",
+    "typescript"
+  ],
+  "author": "Griseld Gerveni <development@venueboost.io> (CTO, VenueBoost Inc.)",
+  "license": "MIT"
+}

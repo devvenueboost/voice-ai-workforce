@@ -1,0 +1,27 @@
+{
+  "name": "@voice-ai-workforce/react",
+  "version": "1.0.0",
+  "description": "React components and hooks for voice AI workforce management",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "echo \"React tests here\""
+  },
+  "dependencies": {
+    "@voice-ai-workforce/core": "workspace:*",
+    "@voice-ai-workforce/types": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.1.6",
+    "@types/react": "^18.2.15"
+  },
+  "peerDependencies": {
+    "react": ">=16.8.0"
+  },
+  "files": ["dist"],
+  "keywords": ["voice-ai", "react", "hooks", "components"],
+  "author": "Griseld Gerveni <development@venueboost.io> (CTO, VenueBoost Inc.)",
+  "license": "MIT"
+}

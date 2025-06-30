@@ -1,0 +1,19 @@
+{
+  "name": "@voice-ai-workforce/types",
+  "version": "1.0.0",
+  "description": "TypeScript type definitions for voice AI workforce management",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "echo \"Types tests here\""
+  },
+  "devDependencies": {
+    "typescript": "^5.1.6"
+  },
+  "files": ["dist"],
+  "keywords": ["typescript", "types", "voice-ai"],
+  "author": "Griseld Gerveni <development@venueboost.io> (CTO, VenueBoost Inc.)",
+  "license": "MIT"
+}

@@ -1,0 +1,23 @@
+{
+  "name": "@voice-ai-workforce/core",
+  "version": "1.0.0",
+  "description": "Core voice AI engine for workforce management",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "echo \"Core tests here\""
+  },
+  "dependencies": {
+    "@voice-ai-workforce/types": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.1.6"
+  },
+  "peerDependencies": {},
+  "files": ["dist"],
+  "keywords": ["voice-ai", "speech-recognition", "workforce"],
+  "author": "Griseld Gerveni <development@venueboost.io> (CTO, VenueBoost Inc.)",
+  "license": "MIT"
+}
