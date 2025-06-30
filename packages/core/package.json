@@ -10,11 +10,17 @@
     "test": "echo \"Core tests here\""
   },
   "devDependencies": {
+    "@types/node": "^24.0.7",
     "typescript": "^5.1.6"
   },
-  "peerDependencies": {},
-  "files": ["dist"],
-  "keywords": ["voice-ai", "speech-recognition", "workforce"],
+  "files": [
+    "dist"
+  ],
+  "keywords": [
+    "voice-ai",
+    "speech-recognition",
+    "workforce"
+  ],
   "author": "Griseld Gerveni <development@venueboost.io> (CTO, VenueBoost Inc.)",
   "license": "MIT"
 }

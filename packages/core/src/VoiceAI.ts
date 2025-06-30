@@ -33,41 +33,46 @@ import {
     }
   
     // Merge user config with sensible defaults
-    private mergeWithDefaults(config: VoiceAIConfig): VoiceAIConfig {
-      const envApiKey = typeof process !== 'undefined' ? process.env?.VOICE_AI_API_KEY : undefined;
-      const envBaseUrl = typeof process !== 'undefined' ? process.env?.VOICE_AI_API_URL : undefined;
+private mergeWithDefaults(config: VoiceAIConfig): VoiceAIConfig {
+    const envApiKey = typeof process !== 'undefined' ? process.env?.VOICE_AI_API_KEY : undefined;
+    const envBaseUrl = typeof process !== 'undefined' ? process.env?.VOICE_AI_API_URL : undefined;
   
-      return {
-        // Use environment variables as fallback (Option 1 + 2 approach)
-        apiBaseUrl: config.apiBaseUrl || envBaseUrl,
-        apiKey: config.apiKey || envApiKey,
-        
-        speechToText: {
+    return {
+      // Use environment variables as fallback (Option 1 + 2 approach)
+      apiBaseUrl: config.apiBaseUrl || envBaseUrl,
+      apiKey: config.apiKey || envApiKey,
+      
+      speechToText: {
+        ...{
           provider: SpeechProvider.WEB_SPEECH,
           language: 'en-US',
-          continuous: false,
-          ...config.speechToText
+          continuous: false
         },
-        
-        textToSpeech: {
+        ...config.speechToText
+      },
+      
+      textToSpeech: {
+        ...{
           provider: SpeechProvider.WEB_SPEECH,
-          speed: 1.0,
-          ...config.textToSpeech
+          speed: 1.0
         },
-        
-        aiProvider: {
+        ...config.textToSpeech
+      },
+      
+      aiProvider: {
+        ...{
           provider: AIProvider.OPENAI,
-          model: 'gpt-3.5-turbo',
-          ...config.aiProvider
+          model: 'gpt-3.5-turbo'
         },
-        
-        wakeWord: config.wakeWord,
-        autoListen: config.autoListen || false,
-        responseMode: config.responseMode || ResponseMode.BOTH,
-        context: config.context || {}
-      };
-    }
-  
+        ...config.aiProvider
+      },
+      
+      wakeWord: config.wakeWord,
+      autoListen: config.autoListen || false,
+      responseMode: config.responseMode || ResponseMode.BOTH,
+      context: config.context || {}
+    };
+  }
     // Initialize speech services
     private async initialize(): Promise<void> {
       try {
