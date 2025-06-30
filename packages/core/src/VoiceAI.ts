@@ -10,7 +10,8 @@ import {
     SpeechProvider,
     AIProvider,
     ResponseMode,
-    ActionType 
+    ActionType,
+    HTTPMethod 
   } from '../../types/src/types';
   
   export class VoiceAI {
@@ -21,6 +22,7 @@ import {
     private eventListeners: Partial<VoiceAIEvents> = {};
   
     constructor(config: VoiceAIConfig, events?: Partial<VoiceAIEvents>) {
+      this.validateConfig(config);
       this.config = this.mergeWithDefaults(config);
       this.eventListeners = events || {};
       this.state = {
@@ -28,52 +30,101 @@ import {
         isProcessing: false,
         isAvailable: false
       };
-  
       this.initialize();
     }
+
+    private validateConfig(config: VoiceAIConfig): void {
+      if (!config.apiBaseUrl) {
+        console.warn('⚠️ No apiBaseUrl provided. API calls will fail. This should only be used for demo purposes.');
+      }
+      
+      if (config.aiProvider?.provider === AIProvider.OPENAI && !config.aiProvider.apiKey) {
+        console.warn('⚠️ OpenAI provider selected but no API key provided. Falling back to keyword matching.');
+      }
+    }
   
-    // Merge user config with sensible defaults
-private mergeWithDefaults(config: VoiceAIConfig): VoiceAIConfig {
-    const envApiKey = typeof process !== 'undefined' ? process.env?.VOICE_AI_API_KEY : undefined;
-    const envBaseUrl = typeof process !== 'undefined' ? process.env?.VOICE_AI_API_URL : undefined;
+    private mergeWithDefaults(config: VoiceAIConfig): VoiceAIConfig {
+      const envApiKey = typeof process !== 'undefined' ? process.env?.VOICE_AI_API_KEY : undefined;
+      const envBaseUrl = typeof process !== 'undefined' ? process.env?.VOICE_AI_API_URL : undefined;
   
-    return {
-      // Use environment variables as fallback (Option 1 + 2 approach)
-      apiBaseUrl: config.apiBaseUrl || envBaseUrl,
-      apiKey: config.apiKey || envApiKey,
-      
-      speechToText: {
-        ...{
-          provider: SpeechProvider.WEB_SPEECH,
-          language: 'en-US',
-          continuous: false
+      return {
+        apiBaseUrl: config.apiBaseUrl || envBaseUrl,
+        apiKey: config.apiKey || envApiKey,
+        
+        speechToText: {
+          ...{
+            provider: SpeechProvider.WEB_SPEECH,
+            language: 'en-US',
+            continuous: false
+          },
+          ...config.speechToText
         },
-        ...config.speechToText
-      },
-      
-      textToSpeech: {
-        ...{
-          provider: SpeechProvider.WEB_SPEECH,
-          speed: 1.0
+        
+        textToSpeech: {
+          ...{
+            provider: SpeechProvider.WEB_SPEECH,
+            speed: 1.0
+          },
+          ...config.textToSpeech
         },
-        ...config.textToSpeech
-      },
-      
-      aiProvider: {
-        ...{
-          provider: AIProvider.OPENAI,
-          model: 'gpt-3.5-turbo'
+        
+        aiProvider: config.aiProvider ? {
+          ...{
+            provider: AIProvider.OPENAI,
+            model: 'gpt-3.5-turbo'
+          },
+          ...config.aiProvider
+        } : undefined,
+        
+        apiCalls: {
+          clock_in: {
+            endpoint: '/api/timesheet/clock-in',
+            method: HTTPMethod.POST,
+            bodyTemplate: { timestamp: '{{timestamp}}', action: 'clock_in' }
+          },
+          clock_out: {
+            endpoint: '/api/timesheet/clock-out',
+            method: HTTPMethod.POST,
+            bodyTemplate: { timestamp: '{{timestamp}}', action: 'clock_out' }
+          },
+          complete_task: {
+            endpoint: '/api/tasks/complete',
+            method: HTTPMethod.PUT,
+            bodyTemplate: { taskName: '{{taskName}}', completedAt: '{{timestamp}}' }
+          },
+          get_status: {
+            endpoint: '/api/status',
+            method: HTTPMethod.GET
+          },
+          break_start: {
+            endpoint: '/api/timesheet/break-start',
+            method: HTTPMethod.POST,
+            bodyTemplate: { timestamp: '{{timestamp}}', action: 'break_start' }
+          },
+          break_end: {
+            endpoint: '/api/timesheet/break-end',
+            method: HTTPMethod.POST,
+            bodyTemplate: { timestamp: '{{timestamp}}', action: 'break_end' }
+          },
+          report_issue: {
+            endpoint: '/api/issues/report',
+            method: HTTPMethod.POST,
+            bodyTemplate: { 
+              description: '{{rawText}}', 
+              type: '{{issueType}}',
+              reportedAt: '{{timestamp}}'
+            }
+          },
+          ...config.apiCalls
         },
-        ...config.aiProvider
-      },
-      
-      wakeWord: config.wakeWord,
-      autoListen: config.autoListen || false,
-      responseMode: config.responseMode || ResponseMode.BOTH,
-      context: config.context || {}
-    };
-  }
-    // Initialize speech services
+        
+        wakeWord: config.wakeWord,
+        autoListen: config.autoListen || false,
+        responseMode: config.responseMode || ResponseMode.BOTH,
+        context: config.context || {}
+      };
+    }
+
     private async initialize(): Promise<void> {
       try {
         await this.initializeSpeechRecognition();
@@ -92,14 +143,13 @@ private mergeWithDefaults(config: VoiceAIConfig): VoiceAIConfig {
         });
       }
     }
-  
-    // Setup speech recognition
+
     private async initializeSpeechRecognition(): Promise<void> {
       if (this.config.speechToText.provider === SpeechProvider.WEB_SPEECH) {
         if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
           throw new Error('Speech recognition not supported in this browser');
         }
-  
+
         const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
         this.speechRecognition = new SpeechRecognition();
         
@@ -107,7 +157,6 @@ private mergeWithDefaults(config: VoiceAIConfig): VoiceAIConfig {
         this.speechRecognition.lang = this.config.speechToText.language;
         this.speechRecognition.interimResults = false;
         
-        // Setup event handlers
         this.speechRecognition.onresult = (event: any) => {
           const transcript = event.results[0][0].transcript;
           this.handleSpeechResult(transcript);
@@ -126,8 +175,7 @@ private mergeWithDefaults(config: VoiceAIConfig): VoiceAIConfig {
         };
       }
     }
-  
-    // Setup speech synthesis
+
     private async initializeSpeechSynthesis(): Promise<void> {
       if (this.config.textToSpeech.provider === SpeechProvider.WEB_SPEECH) {
         if (!('speechSynthesis' in window)) {
@@ -137,14 +185,12 @@ private mergeWithDefaults(config: VoiceAIConfig): VoiceAIConfig {
         this.speechSynthesis = window.speechSynthesis;
       }
     }
-  
-    // Public API Methods
-    
+
     async startListening(): Promise<void> {
       if (!this.state.isAvailable || this.state.isListening) {
         return;
       }
-  
+
       try {
         this.updateState({ isListening: true });
         
@@ -160,12 +206,12 @@ private mergeWithDefaults(config: VoiceAIConfig): VoiceAIConfig {
         });
       }
     }
-  
+
     async stopListening(): Promise<void> {
       if (!this.state.isListening) {
         return;
       }
-  
+
       try {
         if (this.speechRecognition) {
           this.speechRecognition.stop();
@@ -179,21 +225,20 @@ private mergeWithDefaults(config: VoiceAIConfig): VoiceAIConfig {
         });
       }
     }
-  
+
     async processTextInput(text: string): Promise<VoiceResponse> {
       return this.handleSpeechResult(text);
     }
-  
+
     async speak(text: string): Promise<void> {
       if (this.config.responseMode === ResponseMode.TEXT) {
-        return; // Skip speaking in text-only mode
+        return;
       }
-  
+
       try {
         if (this.config.textToSpeech.provider === SpeechProvider.WEB_SPEECH) {
           await this.speakWithWebSpeech(text);
         }
-        // Add other TTS providers here later
       } catch (error) {
         this.handleError({
           code: 'SPEECH_SYNTHESIS_FAILED',
@@ -202,32 +247,24 @@ private mergeWithDefaults(config: VoiceAIConfig): VoiceAIConfig {
         });
       }
     }
-  
-    // Process speech input
+
     private async handleSpeechResult(transcript: string): Promise<VoiceResponse> {
       try {
         this.updateState({ isProcessing: true });
-  
-        // Parse the command using AI
+
         const command = await this.parseCommand(transcript);
-        
-        // Notify listeners
         this.eventListeners.onCommand?.(command);
         
-        // Generate response
         const response = await this.generateResponse(command);
         
-        // Execute any actions
         if (response.actions) {
           await this.executeActions(response.actions);
         }
         
-        // Speak response if needed
         if (this.config.responseMode !== ResponseMode.TEXT) {
           await this.speak(response.text);
         }
         
-        // Notify listeners
         this.eventListeners.onResponse?.(response);
         
         this.updateState({ 
@@ -255,35 +292,101 @@ private mergeWithDefaults(config: VoiceAIConfig): VoiceAIConfig {
         return errorResponse;
       }
     }
-  
-    // Parse user input into structured command
+
     private async parseCommand(transcript: string): Promise<VoiceCommand> {
-      // Simple keyword-based parsing for now
-      // Later this can be enhanced with proper AI
+      if (this.config.aiProvider?.provider === AIProvider.OPENAI && this.config.aiProvider.apiKey) {
+        try {
+          return await this.parseCommandWithOpenAI(transcript);
+        } catch (error) {
+          console.warn('OpenAI parsing failed, falling back to keyword matching:', error);
+        }
+      }
       
+      return this.parseCommandWithKeywords(transcript);
+    }
+
+    private async parseCommandWithOpenAI(transcript: string): Promise<VoiceCommand> {
+      const prompt = `
+Extract the intent and entities from this workforce management voice command: "${transcript}"
+
+Available intents: clock_in, clock_out, complete_task, get_status, break_start, break_end, report_issue, help
+
+Return ONLY valid JSON in this exact format:
+{
+  "intent": "detected_intent",
+  "entities": {
+    "taskName": "extracted task name if any",
+    "issueType": "extracted issue type if any"
+  },
+  "confidence": 0.8
+}
+
+Examples:
+- "clock me in" → {"intent": "clock_in", "entities": {}, "confidence": 0.9}
+- "mark database cleanup as done" → {"intent": "complete_task", "entities": {"taskName": "database cleanup"}, "confidence": 0.85}
+`;
+
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.config.aiProvider!.apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: this.config.aiProvider!.model || 'gpt-3.5-turbo',
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.1,
+          max_tokens: 200
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`OpenAI API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const content = data.choices[0].message.content.trim();
+      
+      const aiResponse = JSON.parse(content);
+
+      return {
+        intent: aiResponse.intent,
+        entities: aiResponse.entities || {},
+        confidence: aiResponse.confidence || 0.7,
+        rawText: transcript,
+        timestamp: new Date()
+      };
+    }
+
+    private parseCommandWithKeywords(transcript: string): VoiceCommand {
       const entities: Record<string, any> = {};
       let intent = 'unknown';
       
-      // Basic intent detection
       const lowerText = transcript.toLowerCase();
       
       if (lowerText.includes('clock in') || lowerText.includes('start work')) {
         intent = 'clock_in';
       } else if (lowerText.includes('clock out') || lowerText.includes('end work')) {
         intent = 'clock_out';
+      } else if (lowerText.includes('break') && lowerText.includes('start')) {
+        intent = 'break_start';
+      } else if (lowerText.includes('break') && lowerText.includes('end')) {
+        intent = 'break_end';
       } else if (lowerText.includes('complete') || lowerText.includes('done')) {
         intent = 'complete_task';
-        // Extract task name
         const taskMatch = lowerText.match(/complete (.+)|mark (.+) (as )?complete|(.+) is done/);
         if (taskMatch) {
           entities.taskName = taskMatch[1] || taskMatch[2] || taskMatch[4];
         }
+      } else if (lowerText.includes('issue') || lowerText.includes('problem')) {
+        intent = 'report_issue';
+        entities.issueType = 'general';
       } else if (lowerText.includes('status') || lowerText.includes('progress')) {
         intent = 'get_status';
       } else if (lowerText.includes('help')) {
         intent = 'help';
       }
-  
+
       return {
         intent,
         entities,
@@ -293,13 +396,11 @@ private mergeWithDefaults(config: VoiceAIConfig): VoiceAIConfig {
       };
     }
   
-    // Generate response for command
     private async generateResponse(command: VoiceCommand): Promise<VoiceResponse> {
-      // Handle built-in commands
       switch (command.intent) {
         case 'help':
           return {
-            text: "I can help you with: clock in, clock out, complete tasks, check status, and more. Just speak naturally!",
+            text: "I can help you with: clock in, clock out, complete tasks, start/end breaks, check status, report issues, and more. Just speak naturally!",
             success: true
           };
           
@@ -307,65 +408,51 @@ private mergeWithDefaults(config: VoiceAIConfig): VoiceAIConfig {
           return {
             text: "I'll clock you in now.",
             success: true,
-            actions: [
-              {
-                type: ActionType.API_CALL,
-                payload: {
-                  endpoint: '/api/timesheet/clock-in',
-                  method: 'POST',
-                  data: { timestamp: new Date() }
-                }
-              }
-            ]
+            actions: this.createApiAction('clock_in', command)
           };
           
         case 'clock_out':
           return {
             text: "I'll clock you out now. Great work today!",
             success: true,
-            actions: [
-              {
-                type: ActionType.API_CALL,
-                payload: {
-                  endpoint: '/api/timesheet/clock-out',
-                  method: 'POST',
-                  data: { timestamp: new Date() }
-                }
-              }
-            ]
+            actions: this.createApiAction('clock_out', command)
           };
           
-          case 'complete_task': {
-            const taskName = command.entities.taskName || 'current task';
-            return {
-              text: `I'll mark "${taskName}" as complete.`,
-              success: true,
-              actions: [
-                {
-                  type: ActionType.API_CALL,
-                  payload: {
-                    endpoint: '/api/tasks/complete',
-                    method: 'PUT',
-                    data: { taskName }
-                  }
-                }
-              ]
-            };
-          }
+        case 'complete_task': {
+          const taskName = command.entities.taskName || 'current task';
+          return {
+            text: `I'll mark "${taskName}" as complete.`,
+            success: true,
+            actions: this.createApiAction('complete_task', command)
+          };
+        }
           
         case 'get_status':
           return {
             text: "Let me check your current status.",
             success: true,
-            actions: [
-              {
-                type: ActionType.API_CALL,
-                payload: {
-                  endpoint: '/api/status',
-                  method: 'GET'
-                }
-              }
-            ]
+            actions: this.createApiAction('get_status', command)
+          };
+
+        case 'break_start':
+          return {
+            text: "Starting your break now. Enjoy your time off!",
+            success: true,
+            actions: this.createApiAction('break_start', command)
+          };
+
+        case 'break_end':
+          return {
+            text: "Welcome back! I'll end your break now.",
+            success: true,
+            actions: this.createApiAction('break_end', command)
+          };
+
+        case 'report_issue':
+          return {
+            text: "I've logged your issue report. Someone will follow up with you soon.",
+            success: true,
+            actions: this.createApiAction('report_issue', command)
           };
           
         default:
@@ -375,8 +462,45 @@ private mergeWithDefaults(config: VoiceAIConfig): VoiceAIConfig {
           };
       }
     }
-  
-    // Execute actions from response
+
+    private createApiAction(intent: string, command: VoiceCommand): any[] {
+      const apiConfig = this.config.apiCalls?.[intent];
+      
+      if (!apiConfig || !this.config.apiBaseUrl) {
+        return [];
+      }
+
+      let body = apiConfig.bodyTemplate ? { ...apiConfig.bodyTemplate } : {};
+      body = this.replaceTemplateVariables(body, command);
+
+      return [{
+        type: ActionType.API_CALL,
+        payload: {
+          endpoint: apiConfig.endpoint,
+          method: apiConfig.method,
+          data: apiConfig.method === HTTPMethod.GET ? undefined : body,
+          headers: apiConfig.headers
+        }
+      }];
+    }
+
+    private replaceTemplateVariables(obj: any, command: VoiceCommand): any {
+      const variables = {
+        timestamp: new Date().toISOString(),
+        taskName: command.entities.taskName || '',
+        issueType: command.entities.issueType || '',
+        rawText: command.rawText,
+        confidence: command.confidence.toString()
+      };
+
+      const jsonStr = JSON.stringify(obj);
+      const replaced = jsonStr.replace(/\{\{(\w+)\}\}/g, (match, key) => {
+        return variables[key as keyof typeof variables] || match;
+      });
+
+      return JSON.parse(replaced);
+    }
+
     private async executeActions(actions: any[]): Promise<void> {
       for (const action of actions) {
         try {
@@ -388,36 +512,35 @@ private mergeWithDefaults(config: VoiceAIConfig): VoiceAIConfig {
         }
       }
     }
-  
-    // Make API call
+
     private async makeApiCall(payload: any): Promise<any> {
       if (!this.config.apiBaseUrl) {
-        throw new Error('API base URL not configured');
+        throw new Error('API base URL not configured. Cannot make API calls.');
       }
-  
+
       const url = `${this.config.apiBaseUrl}${payload.endpoint}`;
       const options: RequestInit = {
         method: payload.method || 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(this.config.apiKey && { 'Authorization': `Bearer ${this.config.apiKey}` })
+          ...(this.config.apiKey && { 'Authorization': `Bearer ${this.config.apiKey}` }),
+          ...(payload.headers || {})
         }
       };
-  
+
       if (payload.data && payload.method !== 'GET') {
         options.body = JSON.stringify(payload.data);
       }
-  
+
       const response = await fetch(url, options);
       
       if (!response.ok) {
         throw new Error(`API call failed: ${response.status} ${response.statusText}`);
       }
-  
+
       return response.json();
     }
-  
-    // Web Speech synthesis
+
     private async speakWithWebSpeech(text: string): Promise<void> {
       return new Promise((resolve, reject) => {
         const utterance = new SpeechSynthesisUtterance(text);
@@ -435,28 +558,25 @@ private mergeWithDefaults(config: VoiceAIConfig): VoiceAIConfig {
         this.speechSynthesis.speak(utterance);
       });
     }
-  
-    // Update state and notify listeners
+
     private updateState(newState: Partial<VoiceAIState>): void {
       this.state = { ...this.state, ...newState };
       this.eventListeners.onStateChange?.(this.state);
     }
-  
-    // Handle errors
+
     private handleError(error: VoiceAIError): void {
       this.updateState({ error: error.message });
       this.eventListeners.onError?.(error);
     }
-  
-    // Public getters
+
     getState(): VoiceAIState {
       return { ...this.state };
     }
-  
+
     updateConfig(newConfig: Partial<VoiceAIConfig>): void {
       this.config = { ...this.config, ...newConfig };
     }
-  
+
     updateContext(context: Record<string, any>): void {
       this.config.context = { ...this.config.context, ...context };
     }

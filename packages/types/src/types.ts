@@ -1,8 +1,16 @@
 // packages/types/src/types.ts
 
-// Core configuration for voice AI
-export interface VoiceAIConfig {
-    // API Configuration (Option 1 + 2 approach)
+// API Call Configuration for flexible endpoints
+export interface ApiCallConfig {
+    endpoint: string;
+    method: HTTPMethod;
+    bodyTemplate?: Record<string, any>;
+    headers?: Record<string, string>;
+  }
+  
+  // Core configuration for voice AI
+  export interface VoiceAIConfig {
+    // API Configuration - REQUIRED for production
     apiBaseUrl?: string;
     apiKey?: string;
     
@@ -19,10 +27,10 @@ export interface VoiceAIConfig {
       speed?: number;
     };
     
-    // AI Processing
-    aiProvider: {
+    // AI Processing - OPTIONAL, falls back to keyword matching
+    aiProvider?: {
       provider: AIProvider;
-      apiKey?: string;
+      apiKey?: string;  // USER must provide this
       model?: string;
     };
     
@@ -31,33 +39,45 @@ export interface VoiceAIConfig {
     autoListen?: boolean;
     responseMode?: ResponseMode;
     
+    // Flexible API endpoint configuration
+    apiCalls?: {
+      clock_in?: ApiCallConfig;
+      clock_out?: ApiCallConfig;
+      complete_task?: ApiCallConfig;
+      get_status?: ApiCallConfig;
+      break_start?: ApiCallConfig;
+      break_end?: ApiCallConfig;
+      report_issue?: ApiCallConfig;
+      [key: string]: ApiCallConfig | undefined; // Allow custom commands
+    };
+    
     // Context for business logic
     context?: Record<string, any>;
   }
   
   // Voice command that comes from user
   export interface VoiceCommand {
-    intent: string;                    // What the user wants to do
-    entities: Record<string, any>;     // Extracted data (names, numbers, etc.)
-    confidence: number;                // How confident AI is (0-1)
-    rawText: string;                   // Original spoken text
-    timestamp: Date;                   // When command was given
+    intent: string;                    
+    entities: Record<string, any>;     
+    confidence: number;                
+    rawText: string;                   
+    timestamp: Date;                   
   }
   
   // Response from voice AI
   export interface VoiceResponse {
-    text: string;                      // What to say back to user
-    success: boolean;                  // Did the command work?
-    data?: any;                        // Additional data
-    actions?: VoiceAction[];           // Actions to execute
+    text: string;                      
+    success: boolean;                  
+    data?: any;                        
+    actions?: VoiceAction[];           
   }
   
   // Actions that can be triggered
   export interface VoiceAction {
     type: ActionType;
     payload: any;
-    endpoint?: string;                 // API endpoint to call
-    method?: HTTPMethod;               // HTTP method
+    endpoint?: string;                 
+    method?: HTTPMethod;               
   }
   
   // State of the voice AI system
@@ -108,7 +128,8 @@ export interface VoiceAIConfig {
     GET = 'GET',
     POST = 'POST',
     PUT = 'PUT',
-    DELETE = 'DELETE'
+    DELETE = 'DELETE',
+    PATCH = 'PATCH'
   }
   
   export enum UserRole {
