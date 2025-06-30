@@ -330,22 +330,23 @@ import {
             ]
           };
           
-        case 'complete_task':
-          const taskName = command.entities.taskName || 'current task';
-          return {
-            text: `I'll mark "${taskName}" as complete.`,
-            success: true,
-            actions: [
-              {
-                type: ActionType.API_CALL,
-                payload: {
-                  endpoint: '/api/tasks/complete',
-                  method: 'PUT',
-                  data: { taskName }
+          case 'complete_task': {
+            const taskName = command.entities.taskName || 'current task';
+            return {
+              text: `I'll mark "${taskName}" as complete.`,
+              success: true,
+              actions: [
+                {
+                  type: ActionType.API_CALL,
+                  payload: {
+                    endpoint: '/api/tasks/complete',
+                    method: 'PUT',
+                    data: { taskName }
+                  }
                 }
-              }
-            ]
-          };
+              ]
+            };
+          }
           
         case 'get_status':
           return {

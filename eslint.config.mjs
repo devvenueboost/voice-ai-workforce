@@ -2,25 +2,23 @@ import js from "@eslint/js";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 
-export default [
+export default tseslint.config(
+  js.configs.recommended,
+  ...tseslint.configs.recommended,
   {
-    files: ["packages/**/*.{ts,tsx}"],
     languageOptions: {
-      globals: globals.browser,
-      parser: tseslint.parser,
-      parserOptions: {
-        project: "./tsconfig.json",
-        sourceType: "module"
-      }
-    },
-    plugins: {
-      "@typescript-eslint": tseslint.plugin
+      globals: {
+        ...globals.browser,
+        ...globals.node,
+      },
     },
     rules: {
-      ...js.configs.recommended.rules,
-      ...tseslint.configs.recommended.rules,
       "@typescript-eslint/no-explicit-any": "warn",
-      "@typescript-eslint/no-unused-vars": "warn"
+      "@typescript-eslint/no-unused-vars": ["warn", { 
+        "argsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_|^[A-Z_]+$" // Ignore CONSTANT_CASE (enums)
+      }],
+      "no-case-declarations": "off",
     }
   }
-];
+);
