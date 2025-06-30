@@ -1,14 +1,8 @@
 // packages/react/src/hooks/useVoiceAI.ts
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { VoiceAI } from '@voice-ai-workforce/core';
-import { 
-  VoiceAIConfig, 
-  VoiceCommand, 
-  VoiceResponse, 
-  VoiceAIState,
-  VoiceAIError 
-} from '@voice-ai-workforce/types';
+import { VoiceAI } from '../../../core/src/VoiceAI';
+import { VoiceAIConfig, VoiceCommand, VoiceResponse, VoiceAIState, VoiceAIError } from '../../../types/src/types';
 
 export interface UseVoiceAIOptions {
   config: VoiceAIConfig;

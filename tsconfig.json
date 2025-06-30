@@ -22,10 +22,5 @@
       "@voice-ai-workforce/react": ["./packages/react/src"]
     }
   },
-  "include": ["packages/*/src/**/*", "examples/*/src/**/*", "playground/src/**/*"],
-  "references": [
-    { "path": "./packages/types" },
-    { "path": "./packages/core" },
-    { "path": "./packages/react" }
-  ]
+  "include": ["packages/*/src/**/*", "examples/*/src/**/*"]
 }

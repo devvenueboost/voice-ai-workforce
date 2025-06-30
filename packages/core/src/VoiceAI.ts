@@ -11,7 +11,7 @@ import {
     AIProvider,
     ResponseMode,
     ActionType 
-  } from '@voice-ai-workforce/types';
+  } from '../../types/src/types';
   
   export class VoiceAI {
     private config: VoiceAIConfig;

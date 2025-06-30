@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useVoiceAI } from '../hooks/useVoiceAI';
-import { VoiceCommand, VoiceResponse, VoiceAIConfig, VoiceAIError } from '@voice-ai-workforce/types';
+import { VoiceCommand, VoiceResponse, VoiceAIConfig, VoiceAIError } from '../../../types/src/types';
 
 // Button size variants
 export type VoiceButtonSize = 'sm' | 'md' | 'lg' | 'xl';

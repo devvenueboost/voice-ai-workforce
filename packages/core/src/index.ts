@@ -5,4 +5,4 @@ export { VoiceAI } from './VoiceAI';
 export { createWorkforceVoiceAI, createQuickWorkforceVoice, WorkforcePresets } from './workforce';
 
 // Re-export types for convenience
-export * from '@voice-ai-workforce/types';
+export * from '../../types/src/types';

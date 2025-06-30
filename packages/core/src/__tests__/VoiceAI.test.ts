@@ -39,12 +39,6 @@ Object.defineProperty(window, 'speechSynthesis', {
   value: mockSpeechSynthesis,
 });
 
-// Mock the AI provider responses
-const mockAIResponse = {
-  success: true,
-  text: 'Command processed successfully',
-  data: { intent: 'help', entities: {} }
-};
 
 describe('VoiceAI', () => {
   let voiceAI: VoiceAI;
@@ -218,7 +212,13 @@ describe('VoiceAI', () => {
       voiceAI = new VoiceAI(mockConfig, { onError: errorHandler });
 
       // Should not throw
-      expect(() => mockSpeechRecognition.onerror?.({ error: 'network' })).not.toThrow();
+     // To:
+expect(() => {
+    const errorHandler = mockSpeechRecognition.onerror as any;
+    if (errorHandler) {
+      errorHandler({ error: 'network' });
+    }
+  }).not.toThrow();
     });
 
     it('should handle invalid input gracefully', async () => {
@@ -271,7 +271,7 @@ describe('Integration Tests', () => {
     // Process a command
     const response = await voiceAI.processTextInput('help');
     
-    expect(response.success).toBe(true);
+    expect(response?.success).toBe(true);
     expect(onCommand).toHaveBeenCalled();
     
     // Check command structure

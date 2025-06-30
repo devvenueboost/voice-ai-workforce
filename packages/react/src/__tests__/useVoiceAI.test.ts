@@ -4,7 +4,7 @@ import { renderHook, act } from '@testing-library/react';
 import { useVoiceAI } from '../hooks/useVoiceAI';
 import { VoiceAIConfig, SpeechProvider, AIProvider, ResponseMode } from '../../../types/src/types';
 
-// Create a proper mock for VoiceAI
+// Create a mock constructor that resolves immediately
 const mockVoiceAI = {
   startListening: jest.fn().mockResolvedValue(undefined),
   stopListening: jest.fn().mockResolvedValue(undefined),
@@ -21,13 +21,26 @@ const mockVoiceAI = {
     isProcessing: false,
     isAvailable: true,
   })),
-  destroy: jest.fn(),
 };
 
-// Mock the VoiceAI core class
-jest.mock('@voice-ai-workforce/core', () => ({
-  VoiceAI: jest.fn().mockImplementation(() => mockVoiceAI),
+// Mock the VoiceAI module
+jest.mock('../../../core/src/VoiceAI', () => ({
+  VoiceAI: jest.fn().mockImplementation((config, events) => {
+    // Simulate immediate initialization
+    setTimeout(() => {
+      events?.onStateChange?.({
+        isListening: false,
+        isProcessing: false,
+        isAvailable: true,
+      });
+    }, 0);
+    
+    return mockVoiceAI;
+  }),
 }));
+
+// Get the mocked constructor for assertions
+const { VoiceAI: MockVoiceAIConstructor } = jest.requireMock('../../../core/src/VoiceAI');
 
 describe('useVoiceAI Hook', () => {
   let mockConfig: VoiceAIConfig;
@@ -53,107 +66,103 @@ describe('useVoiceAI Hook', () => {
   });
 
   describe('Initialization', () => {
-    it('should initialize with correct default state', async () => {
-        const { result } = renderHook(() =>
-          useVoiceAI({ config: mockConfig })
-        );
-      
-        await act(async () => {
-          // Wait for initialization
-          await new Promise(resolve => setTimeout(resolve, 0));
-        });
-      
-        expect(result.current.isListening).toBe(false);
-        expect(result.current.isProcessing).toBe(false);
-        expect(result.current.isAvailable).toBe(false); // Initially false until VoiceAI initializes
-      });
-
-    it('should handle config changes', () => {
-      const { result, rerender } = renderHook(
-        ({ config }) => useVoiceAI({ config }),
-        { initialProps: { config: mockConfig } }
+    it('should initialize and create VoiceAI instance', async () => {
+      const { result } = renderHook(() =>
+        useVoiceAI({ config: mockConfig })
       );
 
-      const newConfig = {
-        ...mockConfig,
-        responseMode: ResponseMode.TEXT,
-      };
+      // Should create VoiceAI instance
+      expect(MockVoiceAIConstructor).toHaveBeenCalledWith(
+        mockConfig,
+        expect.objectContaining({
+          onCommand: expect.any(Function),
+          onResponse: expect.any(Function),
+          onError: expect.any(Function),
+          onStateChange: expect.any(Function),
+        })
+      );
 
-      rerender({ config: newConfig });
+      // Wait for state update
+      await act(async () => {
+        await new Promise(resolve => setTimeout(resolve, 10));
+      });
 
-      expect(result.current.updateConfig).toBeDefined();
+      expect(result.current.isAvailable).toBe(true);
     });
-  });
 
-  describe('Voice Control', () => {
-    it('should provide startListening function', async () => {
+    it('should provide all required functions', async () => {
       const { result } = renderHook(() =>
         useVoiceAI({ config: mockConfig })
       );
 
       await act(async () => {
-        await new Promise(resolve => setTimeout(resolve, 0));
+        await new Promise(resolve => setTimeout(resolve, 10));
       });
 
+      // Check all functions are defined
       expect(typeof result.current.startListening).toBe('function');
+      expect(typeof result.current.stopListening).toBe('function');
+      expect(typeof result.current.processText).toBe('function');
+      expect(typeof result.current.speak).toBe('function');
+      expect(typeof result.current.updateConfig).toBe('function');
+      expect(typeof result.current.updateContext).toBe('function');
+      expect(typeof result.current.getState).toBe('function');
+    });
+  });
+
+  describe('Voice Control Functions', () => {
+    it('should call startListening on VoiceAI instance', async () => {
+      const { result } = renderHook(() =>
+        useVoiceAI({ config: mockConfig })
+      );
 
       await act(async () => {
+        await new Promise(resolve => setTimeout(resolve, 10));
         await result.current.startListening();
       });
 
       expect(mockVoiceAI.startListening).toHaveBeenCalled();
     });
 
-    it('should provide stopListening function', async () => {
+    it('should call stopListening on VoiceAI instance', async () => {
       const { result } = renderHook(() =>
         useVoiceAI({ config: mockConfig })
       );
 
       await act(async () => {
-        await new Promise(resolve => setTimeout(resolve, 0));
-      });
-
-      expect(typeof result.current.stopListening).toBe('function');
-
-      await act(async () => {
+        await new Promise(resolve => setTimeout(resolve, 10));
         await result.current.stopListening();
       });
 
       expect(mockVoiceAI.stopListening).toHaveBeenCalled();
     });
 
-    it('should provide processText function', async () => {
+    it('should call processText and return response', async () => {
       const { result } = renderHook(() =>
         useVoiceAI({ config: mockConfig })
       );
 
+      let response: any;
       await act(async () => {
-        await new Promise(resolve => setTimeout(resolve, 0));
-      });
-
-      expect(typeof result.current.processText).toBe('function');
-
-      await act(async () => {
-        const response = await result.current.processText('test command');
-        expect(response).toBeDefined();
-        expect(response.success).toBe(true);
+        await new Promise(resolve => setTimeout(resolve, 10));
+        response = await result.current.processText('test command');
       });
 
       expect(mockVoiceAI.processTextInput).toHaveBeenCalledWith('test command');
+      expect(response).toEqual({
+        success: true,
+        text: 'Command processed',
+        data: {}
+      });
     });
 
-    it('should provide speak function', async () => {
+    it('should call speak on VoiceAI instance', async () => {
       const { result } = renderHook(() =>
         useVoiceAI({ config: mockConfig })
       );
 
       await act(async () => {
-        await new Promise(resolve => setTimeout(resolve, 0));
-      });
-
-      expect(typeof result.current.speak).toBe('function');
-
-      await act(async () => {
+        await new Promise(resolve => setTimeout(resolve, 10));
         await result.current.speak('Hello world');
       });
 
@@ -161,59 +170,47 @@ describe('useVoiceAI Hook', () => {
     });
   });
 
-  describe('Configuration Updates', () => {
-    it('should provide updateConfig function', async () => {
+  describe('Configuration Functions', () => {
+    it('should call updateConfig on VoiceAI instance', async () => {
       const { result } = renderHook(() =>
         useVoiceAI({ config: mockConfig })
       );
 
+      const newConfig = { responseMode: ResponseMode.TEXT };
+
       await act(async () => {
-        await new Promise(resolve => setTimeout(resolve, 0));
+        await new Promise(resolve => setTimeout(resolve, 10));
+        result.current.updateConfig(newConfig);
       });
 
-      expect(typeof result.current.updateConfig).toBe('function');
-
-      act(() => {
-        result.current.updateConfig({
-          responseMode: ResponseMode.TEXT,
-        });
-      });
-
-      expect(mockVoiceAI.updateConfig).toHaveBeenCalled();
+      expect(mockVoiceAI.updateConfig).toHaveBeenCalledWith(newConfig);
     });
 
-    it('should provide updateContext function', async () => {
+    it('should call updateContext on VoiceAI instance', async () => {
       const { result } = renderHook(() =>
         useVoiceAI({ config: mockConfig })
       );
 
+      const context = { userRole: 'manager' };
+
       await act(async () => {
-        await new Promise(resolve => setTimeout(resolve, 0));
+        await new Promise(resolve => setTimeout(resolve, 10));
+        result.current.updateContext(context);
       });
 
-      expect(typeof result.current.updateContext).toBe('function');
-
-      act(() => {
-        result.current.updateContext({
-          userRole: 'manager',
-        });
-      });
-
-      expect(mockVoiceAI.updateContext).toHaveBeenCalled();
+      expect(mockVoiceAI.updateContext).toHaveBeenCalledWith(context);
     });
   });
 
   describe('State Management', () => {
-    it('should provide getState function', async () => {
+    it('should return state from getState', async () => {
       const { result } = renderHook(() =>
         useVoiceAI({ config: mockConfig })
       );
 
       await act(async () => {
-        await new Promise(resolve => setTimeout(resolve, 0));
+        await new Promise(resolve => setTimeout(resolve, 10));
       });
-
-      expect(typeof result.current.getState).toBe('function');
 
       const state = result.current.getState();
       expect(state).toHaveProperty('isListening');
@@ -221,74 +218,82 @@ describe('useVoiceAI Hook', () => {
       expect(state).toHaveProperty('isAvailable');
     });
 
-    it('should handle state updates correctly', async () => {
+    it('should update state when VoiceAI state changes', async () => {
       const { result } = renderHook(() =>
         useVoiceAI({ config: mockConfig })
       );
 
+      // Initial state
+      expect(result.current.isAvailable).toBe(false);
+
+      // Wait for state change from mock
       await act(async () => {
-        await new Promise(resolve => setTimeout(resolve, 0));
+        await new Promise(resolve => setTimeout(resolve, 10));
       });
 
-      // Initial state should be defined
-      expect(result.current.isListening).toBeDefined();
-      expect(result.current.isProcessing).toBeDefined();
-      expect(result.current.isAvailable).toBeDefined();
+      expect(result.current.isAvailable).toBe(true);
     });
   });
 
-  describe('Event Handling', () => {
-    it('should call onCommand when provided', () => {
+  describe('Event Handlers', () => {
+    it('should call event handlers when provided', () => {
       const onCommand = jest.fn();
-      
+      const onResponse = jest.fn();
+      const onError = jest.fn();
+
       renderHook(() =>
         useVoiceAI({
           config: mockConfig,
           onCommand,
-        })
-      );
-
-      expect(onCommand).toBeDefined();
-    });
-
-    it('should call onResponse when provided', () => {
-      const onResponse = jest.fn();
-      
-      renderHook(() =>
-        useVoiceAI({
-          config: mockConfig,
           onResponse,
-        })
-      );
-
-      expect(onResponse).toBeDefined();
-    });
-
-    it('should call onError when provided', () => {
-      const onError = jest.fn();
-      
-      renderHook(() =>
-        useVoiceAI({
-          config: mockConfig,
           onError,
         })
       );
 
-      expect(onError).toBeDefined();
+      // Verify VoiceAI was created with event handlers
+      expect(MockVoiceAIConstructor).toHaveBeenCalledWith(
+        mockConfig,
+        expect.objectContaining({
+          onCommand: expect.any(Function),
+          onResponse: expect.any(Function),
+          onError: expect.any(Function),
+          onStateChange: expect.any(Function),
+        })
+      );
     });
   });
 
   describe('Cleanup', () => {
-    it('should cleanup on unmount', () => {
+    it('should call stopListening on unmount', async () => {
       const { unmount } = renderHook(() =>
         useVoiceAI({ config: mockConfig })
       );
-   
-      // Unmount and check it doesn't throw
-      expect(() => unmount()).not.toThrow();
-      
-      // Check that stopListening was called (since destroy doesn't exist)
+
+      await act(async () => {
+        await new Promise(resolve => setTimeout(resolve, 10));
+      });
+
+      unmount();
+
+      // stopListening should be called during cleanup
       expect(mockVoiceAI.stopListening).toHaveBeenCalled();
     });
-   });
+  });
+
+  describe('Auto Start', () => {
+    it('should auto start when autoStart is true', async () => {
+      renderHook(() =>
+        useVoiceAI({ 
+          config: mockConfig, 
+          autoStart: true 
+        })
+      );
+
+      await act(async () => {
+        await new Promise(resolve => setTimeout(resolve, 10));
+      });
+
+      expect(mockVoiceAI.startListening).toHaveBeenCalled();
+    });
+  });
 });

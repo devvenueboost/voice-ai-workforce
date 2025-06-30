@@ -25,24 +25,16 @@ const config = {
 };
 
 function App() {
-  const handleCommand = (command) => {
-    console.log('Voice command received:', command.intent, command.rawText);
-  };
-
-  const handleResponse = (response) => {
-    console.log('AI response:', response.text);
-  };
-
   return (
-    <div className="app">
+    <div>
       <h1>Voice AI Demo</h1>
       <VoiceButton
         config={config}
         size="lg"
-        onCommand={handleCommand}
-        onResponse={handleResponse}
+        onCommand={(command) => console.log('Command:', command)}
+        onResponse={(response) => console.log('Response:', response)}
       />
-      <p>Click the button and say: "help", "clock me in", or "complete task"</p>
+      <p>Click and say: "help", "clock me in", "clock me out", or "complete task"</p>
     </div>
   );
 }
@@ -72,150 +64,32 @@ const config = {
 
 const voiceAI = new VoiceAI(config, {
   onCommand: (command) => {
-    document.getElementById('command-output').textContent = 
-      `Command: ${command.intent} - "${command.rawText}"`;
+    console.log('Command received:', command.intent, command.rawText);
   },
   onResponse: (response) => {
-    document.getElementById('response-output').textContent = 
-      `Response: ${response.text}`;
+    console.log('Response:', response.text);
   },
   onStateChange: (state) => {
-    const button = document.getElementById('voice-button');
-    button.textContent = state.isListening ? 'Stop Listening' : 'Start Listening';
-    button.disabled = !state.isAvailable;
+    console.log('State changed:', state);
   }
 });
 
-document.getElementById('voice-button').addEventListener('click', async () => {
-  const state = voiceAI.getState();
-  if (state.isListening) {
-    await voiceAI.stopListening();
-  } else {
-    await voiceAI.startListening();
-  }
-});
+// Start listening
+await voiceAI.startListening();
+
+// Or process text directly
+const response = await voiceAI.processTextInput('help');
+console.log(response.text);
 ```
 
-## Real-World Examples
-
-### Task Manager with Voice Commands
+## Using the useVoiceAI Hook
 
 ```tsx
-import React, { useState } from 'react';
+import React from 'react';
 import { useVoiceAI } from '@voice-ai-workforce/react';
 import { SpeechProvider, AIProvider, ResponseMode } from '@voice-ai-workforce/types';
 
-function TaskManager() {
-  const [tasks, setTasks] = useState([
-    { id: 1, name: 'Update documentation', completed: false },
-    { id: 2, name: 'Fix login bug', completed: false },
-    { id: 3, name: 'Deploy to production', completed: false }
-  ]);
-  const [isClocked, setIsClocked] = useState(false);
-
-  const config = {
-    speechToText: { provider: SpeechProvider.WEB_SPEECH },
-    textToSpeech: { provider: SpeechProvider.WEB_SPEECH },
-    aiProvider: { provider: AIProvider.OPENAI },
-    responseMode: ResponseMode.BOTH,
-  };
-
-  const handleCommand = (command) => {
-    switch (command.intent) {
-      case 'clock_in':
-        setIsClocked(true);
-        break;
-      
-      case 'clock_out':
-        setIsClocked(false);
-        break;
-      
-      case 'complete_task':
-        const taskName = command.entities.taskName;
-        if (taskName) {
-          setTasks(prev => prev.map(task => 
-            task.name.toLowerCase().includes(taskName.toLowerCase())
-              ? { ...task, completed: true }
-              : task
-          ));
-        }
-        break;
-    }
-  };
-
-  const {
-    isListening,
-    isProcessing,
-    startListening,
-    stopListening
-  } = useVoiceAI({
-    config,
-    onCommand: handleCommand
-  });
-
-  return (
-    <div className="task-manager">
-      <div className="status-bar">
-        <span>Status: {isClocked ? 'Clocked In ✅' : 'Clocked Out ⏰'}</span>
-        <button 
-          onClick={isListening ? stopListening : startListening}
-          disabled={isProcessing}
-          style={{
-            backgroundColor: isListening ? '#ef4444' : '#3b82f6',
-            color: 'white',
-            border: 'none',
-            padding: '10px 20px',
-            borderRadius: '5px',
-            cursor: 'pointer'
-          }}
-        >
-          {isListening ? '🛑 Stop' : '🎤 Listen'}
-        </button>
-      </div>
-
-      <div className="tasks">
-        <h3>Tasks</h3>
-        {tasks.map(task => (
-          <div 
-            key={task.id} 
-            style={{
-              padding: '10px',
-              margin: '5px 0',
-              backgroundColor: task.completed ? '#dcfce7' : '#f3f4f6',
-              borderRadius: '5px',
-              textDecoration: task.completed ? 'line-through' : 'none'
-            }}
-          >
-            {task.name} {task.completed && '✅'}
-          </div>
-        ))}
-      </div>
-
-      <div className="voice-commands">
-        <h4>Try saying:</h4>
-        <ul>
-          <li>"Clock me in"</li>
-          <li>"Complete documentation task"</li>
-          <li>"Complete login task"</li>
-          <li>"Clock me out"</li>
-        </ul>
-      </div>
-    </div>
-  );
-}
-```
-
-### Text Input Fallback
-
-```tsx
-import React, { useState } from 'react';
-import { useVoiceAI } from '@voice-ai-workforce/react';
-import { SpeechProvider, AIProvider, ResponseMode } from '@voice-ai-workforce/types';
-
-function VoiceWithFallback() {
-  const [textInput, setTextInput] = useState('');
-  const [lastResponse, setLastResponse] = useState(null);
-
+function CustomVoiceComponent() {
   const config = {
     speechToText: { provider: SpeechProvider.WEB_SPEECH },
     textToSpeech: { provider: SpeechProvider.WEB_SPEECH },
@@ -229,13 +103,52 @@ function VoiceWithFallback() {
     isAvailable,
     startListening,
     stopListening,
+    error
+  } = useVoiceAI({
+    config,
+    onCommand: (command) => console.log('Command:', command),
+    onResponse: (response) => console.log('Response:', response),
+  });
+
+  return (
+    <div>
+      <button 
+        onClick={isListening ? stopListening : startListening}
+        disabled={!isAvailable || isProcessing}
+      >
+        {isListening ? 'Stop Listening' : 'Start Listening'}
+      </button>
+      
+      {isProcessing && <p>Processing...</p>}
+      {error && <p>Error: {error}</p>}
+      {!isAvailable && <p>Voice not available</p>}
+    </div>
+  );
+}
+```
+
+## Text Input Fallback
+
+```tsx
+import React, { useState } from 'react';
+import { useVoiceAI } from '@voice-ai-workforce/react';
+
+function VoiceWithTextFallback() {
+  const [textInput, setTextInput] = useState('');
+  const [lastResponse, setLastResponse] = useState(null);
+
+  const {
+    isListening,
+    isAvailable,
+    startListening,
+    stopListening,
     processText
   } = useVoiceAI({
     config,
     onResponse: setLastResponse
   });
 
-  const handleTextSubmit = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (textInput.trim()) {
       await processText(textInput);
@@ -244,288 +157,183 @@ function VoiceWithFallback() {
   };
 
   return (
-    <div style={{ padding: '20px', maxWidth: '500px' }}>
-      <div style={{ marginBottom: '20px' }}>
-        <h3>Voice Input</h3>
-        {isAvailable ? (
-          <button 
-            onClick={isListening ? stopListening : startListening}
-            disabled={isProcessing}
-            style={{
-              backgroundColor: isListening ? '#ef4444' : '#3b82f6',
-              color: 'white',
-              border: 'none',
-              padding: '10px 20px',
-              borderRadius: '5px',
-              cursor: 'pointer'
-            }}
-          >
-            {isListening ? '🛑 Stop Listening' : '🎤 Start Listening'}
-          </button>
-        ) : (
-          <p style={{ color: '#6b7280' }}>Voice not available in this browser</p>
-        )}
-      </div>
-
-      <div style={{ marginBottom: '20px' }}>
-        <h3>Text Input</h3>
-        <form onSubmit={handleTextSubmit} style={{ display: 'flex', gap: '10px' }}>
-          <input
-            type="text"
-            value={textInput}
-            onChange={(e) => setTextInput(e.target.value)}
-            placeholder="Type your command here..."
-            disabled={isProcessing}
-            style={{
-              flex: 1,
-              padding: '10px',
-              border: '1px solid #d1d5db',
-              borderRadius: '5px'
-            }}
-          />
-          <button 
-            type="submit" 
-            disabled={isProcessing || !textInput.trim()}
-            style={{
-              backgroundColor: '#10b981',
-              color: 'white',
-              border: 'none',
-              padding: '10px 20px',
-              borderRadius: '5px',
-              cursor: 'pointer'
-            }}
-          >
-            Send
-          </button>
-        </form>
-      </div>
-
-      {lastResponse && (
-        <div style={{
-          padding: '15px',
-          backgroundColor: '#f0f9ff',
-          border: '1px solid #0ea5e9',
-          borderRadius: '5px',
-          marginBottom: '20px'
-        }}>
-          <h4>Response:</h4>
-          <p>{lastResponse.text}</p>
-        </div>
+    <div>
+      {/* Voice Input */}
+      {isAvailable && (
+        <button onClick={isListening ? stopListening : startListening}>
+          {isListening ? 'Stop' : 'Start'} Voice
+        </button>
       )}
 
-      {isProcessing && (
-        <div style={{
-          padding: '10px',
-          backgroundColor: '#fef3c7',
-          border: '1px solid #f59e0b',
-          borderRadius: '5px',
-          textAlign: 'center'
-        }}>
-          Processing...
-        </div>
-      )}
+      {/* Text Input Fallback */}
+      <form onSubmit={handleSubmit}>
+        <input
+          value={textInput}
+          onChange={(e) => setTextInput(e.target.value)}
+          placeholder="Type: help, clock me in, etc."
+        />
+        <button type="submit">Send</button>
+      </form>
+
+      {/* Response */}
+      {lastResponse && <p>Response: {lastResponse.text}</p>}
     </div>
   );
 }
 ```
 
-### Custom Error Handling
-
-```tsx
-import React, { useState } from 'react';
-import { VoiceButton } from '@voice-ai-workforce/react';
-import { SpeechProvider, AIProvider, ResponseMode } from '@voice-ai-workforce/types';
-
-function VoiceWithErrorHandling() {
-  const [error, setError] = useState(null);
-
-  const config = {
-    speechToText: { provider: SpeechProvider.WEB_SPEECH },
-    textToSpeech: { provider: SpeechProvider.WEB_SPEECH },
-    aiProvider: { provider: AIProvider.OPENAI },
-    responseMode: ResponseMode.BOTH,
-  };
-
-  const handleError = (error) => {
-    console.error('Voice AI Error:', error);
-    
-    const errorMessages = {
-      'SPEECH_RECOGNITION_ERROR': 'Could not understand speech. Please try again.',
-      'INITIALIZATION_FAILED': 'Voice features are not available in this browser.',
-      'START_LISTENING_FAILED': 'Could not access microphone. Please check permissions.',
-    };
-    
-    setError(errorMessages[error.code] || 'An unexpected error occurred.');
-    
-    // Clear error after 5 seconds
-    setTimeout(() => setError(null), 5000);
-  };
-
-  const clearError = () => setError(null);
-
-  return (
-    <div style={{ padding: '20px', maxWidth: '400px' }}>
-      <VoiceButton
-        config={config}
-        size="lg"
-        onError={handleError}
-        onCommand={clearError} // Clear errors on successful command
-      />
-
-      {error && (
-        <div style={{
-          marginTop: '20px',
-          padding: '15px',
-          backgroundColor: '#fef2f2',
-          border: '1px solid #ef4444',
-          borderRadius: '5px',
-          color: '#dc2626'
-        }}>
-          <p>{error}</p>
-          <button 
-            onClick={clearError}
-            style={{
-              marginTop: '10px',
-              backgroundColor: '#ef4444',
-              color: 'white',
-              border: 'none',
-              padding: '5px 10px',
-              borderRadius: '3px',
-              cursor: 'pointer'
-            }}
-          >
-            Dismiss
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-```
-
-## Integration Examples
-
-### Using with Existing UI
-
-```tsx
-import React, { useState } from 'react';
-import { useVoiceAI } from '@voice-ai-workforce/react';
-
-function ExistingDashboard() {
-  const [data, setData] = useState({ clockedIn: false, tasks: [] });
-  
-  const {
-    isListening,
-    startListening,
-    stopListening
-  } = useVoiceAI({
-    config,
-    onCommand: (command) => {
-      // Integrate with existing state management
-      switch (command.intent) {
-        case 'clock_in':
-          setData(prev => ({ ...prev, clockedIn: true }));
-          break;
-        case 'clock_out':
-          setData(prev => ({ ...prev, clockedIn: false }));
-          break;
-      }
-    }
-  });
-
-  return (
-    <div className="dashboard">
-      <header>
-        <h1>Employee Dashboard</h1>
-        <div className="voice-control">
-          <small>Voice Control:</small>
-          <button onClick={isListening ? stopListening : startListening}>
-            {isListening ? 'Stop' : 'Start'}
-          </button>
-        </div>
-      </header>
-      
-      <main>
-        <div className="status">
-          Status: {data.clockedIn ? 'Working' : 'Not Working'}
-        </div>
-        {/* Rest of your existing dashboard */}
-      </main>
-    </div>
-  );
-}
-```
-
-### Testing Voice Commands
+## Testing Commands
 
 ```javascript
-// For testing without actually speaking
+// Test all built-in commands
 import { VoiceAI } from '@voice-ai-workforce/core';
 
 const voiceAI = new VoiceAI(config);
 
-// Test different commands
-const testCommands = [
-  'help',
-  'clock me in',
-  'complete documentation task',
-  'what is my status',
-  'clock me out'
-];
+async function testCommands() {
+  const commands = [
+    'help',
+    'clock me in', 
+    'start work',
+    'clock me out',
+    'end work', 
+    'complete task',
+    'complete documentation',
+    'what is my status'
+  ];
 
-async function testAllCommands() {
-  for (const command of testCommands) {
-    console.log(`\nTesting: "${command}"`);
+  for (const command of commands) {
     const response = await voiceAI.processTextInput(command);
-    console.log(`Response: ${response.text}`);
-    console.log(`Success: ${response.success}`);
+    console.log(`"${command}" -> Intent: ${response.success ? 'recognized' : 'unknown'}`);
+    console.log(`Response: ${response.text}\n`);
   }
 }
 
-testAllCommands();
+testCommands();
 ```
 
-## Browser Compatibility Examples
-
-### Feature Detection
+## Browser Support Check
 
 ```javascript
 function checkVoiceSupport() {
   const hasRecognition = 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
   const hasSynthesis = 'speechSynthesis' in window;
+  const isHTTPS = location.protocol === 'https:' || location.hostname === 'localhost';
   
   return {
-    recognition: hasRecognition,
-    synthesis: hasSynthesis,
-    fullSupport: hasRecognition && hasSynthesis
+    canListen: hasRecognition && isHTTPS,
+    canSpeak: hasSynthesis,
+    needsHTTPS: !isHTTPS
   };
 }
 
 const support = checkVoiceSupport();
+console.log('Voice support:', support);
 
-if (!support.fullSupport) {
-  console.log('Limited voice support detected');
-  // Show text input fallback
+if (!support.canListen) {
+  console.log('Use text input only');
 }
 ```
 
-### Graceful Degradation
+## Error Handling
 
 ```tsx
-function ResponsiveVoiceUI() {
-  const [support] = useState(() => checkVoiceSupport());
-  
-  if (!support.recognition) {
-    // Show text-only interface
-    return <TextOnlyInterface />;
-  }
-  
-  // Show full voice interface
-  return <VoiceInterface />;
+import React, { useState } from 'react';
+import { VoiceButton } from '@voice-ai-workforce/react';
+
+function VoiceWithErrors() {
+  const [error, setError] = useState(null);
+
+  const handleError = (error) => {
+    console.error('Voice error:', error);
+    setError(error.message);
+    setTimeout(() => setError(null), 5000);
+  };
+
+  return (
+    <div>
+      <VoiceButton
+        config={config}
+        onError={handleError}
+        onCommand={() => setError(null)} // Clear error on success
+      />
+      
+      {error && (
+        <div style={{ color: 'red', marginTop: '10px' }}>
+          Error: {error}
+        </div>
+      )}
+    </div>
+  );
 }
 ```
 
-These examples show realistic usage patterns for the voice AI system as it currently exists, without any fictional features or complex deployment scenarios. (isListening.value) {
+## Minimal Working Example
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Voice AI Test</title>
+</head>
+<body>
+    <button id="voice-btn">Start Listening</button>
+    <div id="output"></div>
+
+    <script type="module">
+        import { VoiceAI } from '@voice-ai-workforce/core';
+        import { SpeechProvider, AIProvider, ResponseMode } from '@voice-ai-workforce/types';
+
+        const config = {
+            speechToText: { provider: SpeechProvider.WEB_SPEECH },
+            textToSpeech: { provider: SpeechProvider.WEB_SPEECH },
+            aiProvider: { provider: AIProvider.OPENAI },
+            responseMode: ResponseMode.BOTH,
+        };
+
+        const voiceAI = new VoiceAI(config, {
+            onCommand: (cmd) => {
+                document.getElementById('output').innerHTML = `Command: ${cmd.intent}`;
+            },
+            onResponse: (res) => {
+                document.getElementById('output').innerHTML += `<br>Response: ${res.text}`;
+            },
+            onStateChange: (state) => {
+                document.getElementById('voice-btn').textContent = 
+                    state.isListening ? 'Stop Listening' : 'Start Listening';
+            }
+        });
+
+        document.getElementById('voice-btn').onclick = async () => {
+            const state = voiceAI.getState();
+            if (state.isListening) {
+                await voiceAI.stopListening();
+            } else {
+                await voiceAI.startListening();
+            }
+        };
+    </script>
+</body>
+</html>
+```
+
+## Running the Demo
+
+```bash
+# Clone your repo
+git clone https://github.com/devvenueboost/voice-ai-workforce.git
+cd voice-ai-workforce
+
+# Install and build
+npm install
+npm run build:sequential
+
+# Run demo
+cd examples/basic-demo
+npm run dev
+```
+
+That's it. These examples show exactly what your voice AI system can do - no more, no less. (isListening.value) {
     await voiceAI.stopListening();
   } else {
     await voiceAI.startListening();

@@ -1,6 +1,6 @@
 {
   "name": "voice-ai-workforce",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Voice AI assistant for workforce management - hands-free task updates, time tracking, and team communication. Built by VenueBoost Inc.",
   "repository": {
     "type": "git",
@@ -13,8 +13,7 @@
   "private": false,
   "workspaces": [
     "packages/*",
-    "examples/*",
-    "playground"
+    "examples/*"
   ],
   "scripts": {
     "build": "npm run build --workspaces",
