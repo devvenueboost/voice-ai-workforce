@@ -1,6 +1,6 @@
 {
   "name": "@voice-ai-workforce/react",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "React components and hooks for Voice AI Workforce",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -23,6 +23,11 @@
     "react": ">=16.8.0",
     "react-dom": ">=16.8.0"
   },
-  "keywords": ["react", "voice-ai", "components", "hooks"],
+  "keywords": [
+    "react",
+    "voice-ai",
+    "components",
+    "hooks"
+  ],
   "license": "MIT"
- }
+}
