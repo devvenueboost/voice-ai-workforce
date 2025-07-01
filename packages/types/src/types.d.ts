@@ -1,3 +1,9 @@
+export interface ApiCallConfig {
+    endpoint: string;
+    method: HTTPMethod;
+    bodyTemplate?: Record<string, any>;
+    headers?: Record<string, string>;
+}
 export interface VoiceAIConfig {
     apiBaseUrl?: string;
     apiKey?: string;
@@ -11,7 +17,7 @@ export interface VoiceAIConfig {
         voice?: string;
         speed?: number;
     };
-    aiProvider: {
+    aiProvider?: {
         provider: AIProvider;
         apiKey?: string;
         model?: string;
@@ -19,6 +25,16 @@ export interface VoiceAIConfig {
     wakeWord?: string;
     autoListen?: boolean;
     responseMode?: ResponseMode;
+    apiCalls?: {
+        clock_in?: ApiCallConfig;
+        clock_out?: ApiCallConfig;
+        complete_task?: ApiCallConfig;
+        get_status?: ApiCallConfig;
+        break_start?: ApiCallConfig;
+        break_end?: ApiCallConfig;
+        report_issue?: ApiCallConfig;
+        [key: string]: ApiCallConfig | undefined;
+    };
     context?: Record<string, any>;
 }
 export interface VoiceCommand {
@@ -79,7 +95,8 @@ export declare enum HTTPMethod {
     GET = "GET",
     POST = "POST",
     PUT = "PUT",
-    DELETE = "DELETE"
+    DELETE = "DELETE",
+    PATCH = "PATCH"
 }
 export declare enum UserRole {
     ADMIN = "admin",
