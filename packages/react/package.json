@@ -1,14 +1,14 @@
 {
   "name": "@voice-ai-workforce/react",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "React components and hooks for Voice AI Workforce",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "dist/react/src/index.js",
+  "types": "dist/react/src/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "require": "./dist/index.js",
-      "import": "./dist/index.js"
+      "types": "./dist/react/src/index.d.ts",
+      "require": "./dist/react/src/index.js",
+      "import": "./dist/react/src/index.js"
     }
   },
   "files": [

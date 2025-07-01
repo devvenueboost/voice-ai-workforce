@@ -15,6 +15,11 @@
     "strict": false,
     "esModuleInterop": true
   },
+  "baseUrl": ".",
+    "paths": {
+      "@voice-ai-workforce/core": ["../core/src"],
+      "@voice-ai-workforce/types": ["../types/src"]
+    },
   "include": ["src/**/*"],
   "exclude": ["dist", "node_modules", "**/*.test.tsx", "**/__tests__/**/*"]
 }
