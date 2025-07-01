@@ -262,9 +262,6 @@ Fully optimized for mobile workforce:
 ## 🎬 Examples
 
 - **[Basic Demo](./examples/basic-demo)** - Simple voice commands showcase
-- **[Field Worker App](./examples/field-worker)** - Complete field operations demo
-- **[Manager Dashboard](./examples/manager-dashboard)** - Management interface
-- **[Playground](./playground)** - Interactive demo and testing
 
 ## 🔧 Advanced Usage
 
