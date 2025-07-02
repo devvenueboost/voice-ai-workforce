@@ -16,7 +16,8 @@ import {
   AIProviderConfig,
   OpenAIConfig,
   AnthropicConfig,
-  GoogleConfig
+  GoogleConfig,
+  KeywordsConfig
 } from '../../types/src/types';
 
 import { DEFAULT_COMMAND_REGISTRY, findCommandByTrigger, getCommandByIntent } from '../../types/src/commands';
@@ -28,7 +29,8 @@ export class VoiceAI {
   private speechSynthesis!: SpeechSynthesis;
   private eventListeners: Partial<VoiceAIEvents> = {};
   private commandRegistry: CommandRegistry;
-  private providerInstances: Map<AIProvider, any> = new Map();
+  // Remove unused providerInstances to fix TS6133
+  // private providerInstances: Map<AIProvider, any> = new Map();
 
   constructor(config: VoiceAIConfig, events?: Partial<VoiceAIEvents>) {
     this.validateConfig(config);
@@ -36,13 +38,19 @@ export class VoiceAI {
     this.eventListeners = events || {};
     this.commandRegistry = this.initializeCommandRegistry();
     
+    // FIX: Initialize providerStatus with all required AIProvider keys
     this.state = {
       isListening: false,
       isProcessing: false,
       isAvailable: false,
       commandHistory: [],
       suggestedCommands: [],
-      providerStatus: {},
+      providerStatus: {
+        [AIProvider.OPENAI]: 'error',
+        [AIProvider.ANTHROPIC]: 'error', 
+        [AIProvider.GOOGLE]: 'error',
+        [AIProvider.KEYWORDS]: 'available'
+      } as Record<AIProvider, 'available' | 'error' | 'timeout'>,
       isCommandCenterOpen: false
     };
     
@@ -106,20 +114,21 @@ export class VoiceAI {
         timeoutMs: config.aiProviders.timeoutMs || 5000
       },
       
+      // FIX: Put provider after spread to avoid overwrite conflict
       speechToText: {
-        provider: SpeechProvider.WEB_SPEECH,
         language: 'en-US',
         continuous: false,
         interimResults: false,
-        ...config.speechToText
+        ...config.speechToText,
+        provider: config.speechToText?.provider || SpeechProvider.WEB_SPEECH
       },
       
       textToSpeech: {
-        provider: SpeechProvider.WEB_SPEECH,
         speed: 1.0,
         pitch: 1.0,
         volume: 1.0,
-        ...config.textToSpeech
+        ...config.textToSpeech,
+        provider: config.textToSpeech?.provider || SpeechProvider.WEB_SPEECH
       },
       
       commands: {
@@ -205,8 +214,13 @@ export class VoiceAI {
   }
 
   private async initializeAIProviders(): Promise<void> {
-    // Initialize provider status
-    const providerStatus: Record<AIProvider, 'available' | 'error' | 'timeout'> = {} as any;
+    // FIX: Initialize with proper typing
+    const providerStatus = {
+      [AIProvider.OPENAI]: 'error',
+      [AIProvider.ANTHROPIC]: 'error',
+      [AIProvider.GOOGLE]: 'error',
+      [AIProvider.KEYWORDS]: 'available'
+    } as Record<AIProvider, 'available' | 'error' | 'timeout'>;
     
     // Test primary provider
     try {
@@ -443,7 +457,7 @@ export class VoiceAI {
         console.warn(`Provider ${provider.provider} failed:`, error);
         
         // Update provider status
-        const newStatus = { ...this.state.providerStatus };
+        const newStatus = { ...this.state.providerStatus! };
         newStatus[provider.provider] = 'error';
         this.updateState({ providerStatus: newStatus });
         
@@ -456,6 +470,7 @@ export class VoiceAI {
   }
 
   private async parseCommandWithProvider(transcript: string, provider: AIProviderConfig): Promise<VoiceCommand> {
+    // FIX: Add type guards to ensure proper typing
     switch (provider.provider) {
       case AIProvider.OPENAI:
         return this.parseCommandWithOpenAI(transcript, provider as OpenAIConfig);
@@ -466,7 +481,9 @@ export class VoiceAI {
       case AIProvider.KEYWORDS:
         return this.parseCommandWithKeywords(transcript);
       default:
-        throw new Error(`Unsupported provider: ${provider.provider}`);
+        // This should never happen with proper typing, but provides safety
+        const exhaustiveCheck: never = provider;
+        throw new Error(`Unsupported provider: ${(exhaustiveCheck as any).provider}`);
     }
   }
 

@@ -4,13 +4,16 @@ import React, { useEffect, useState } from 'react';
 import { useVoiceAI } from '../hooks/useVoiceAI';
 import { useComponentTheme } from '../hooks/useVoiceTheme';
 import { VoiceAIConfig } from '../../../types/src/types';
-import { VoiceAIThemeProps, VoiceAIStatusVariant } from '../types/theme';
+import { VoiceAIThemeProps } from '../types/theme';
 import { getStatusColor } from '../utils/theme';
 
+// Status variant type specifically for this component
+type VoiceStatusVariant = 'dot' | 'minimal' | 'badge' | 'full';
+
 // Props interface
-export interface VoiceStatusIndicatorProps extends VoiceAIThemeProps {
+export interface VoiceStatusIndicatorProps extends Omit<VoiceAIThemeProps, 'variant'> {
   config: VoiceAIConfig;
-  variant?: VoiceAIStatusVariant;
+  variant?: VoiceStatusVariant;
   showProvider?: boolean;
   showConnection?: boolean;
   showLabel?: boolean;
@@ -26,41 +29,41 @@ type VoiceStatus = 'online' | 'offline' | 'listening' | 'processing' | 'error';
 // Connection quality type
 type ConnectionQuality = 'excellent' | 'good' | 'poor' | 'offline';
 
-// Icons
-const WifiIcon = ({ className }: { className?: string }) => (
-  <svg className={className} fill="currentColor" viewBox="0 0 24 24">
+// Icons with proper SVG props
+const WifiIcon = ({ className, ...props }: React.SVGProps<SVGSVGElement>) => (
+  <svg className={className} fill="currentColor" viewBox="0 0 24 24" {...props}>
     <path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.07 2.93 1 9zm8 8l3 3 3-3c-1.65-1.65-4.35-1.65-6 0zm-4-4l2 2c2.76-2.76 7.24-2.76 10 0l2-2C15.14 9.14 8.86 9.14 5 13z"/>
   </svg>
 );
 
-const MicrophoneIcon = ({ className }: { className?: string }) => (
-  <svg className={className} fill="currentColor" viewBox="0 0 24 24">
+const MicrophoneIcon = ({ className, ...props }: React.SVGProps<SVGSVGElement>) => (
+  <svg className={className} fill="currentColor" viewBox="0 0 24 24" {...props}>
     <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
     <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
   </svg>
 );
 
-const LoadingSpinner = ({ className }: { className?: string }) => (
-  <svg className={`animate-spin ${className}`} fill="none" viewBox="0 0 24 24">
+const LoadingSpinner = ({ className, ...props }: React.SVGProps<SVGSVGElement>) => (
+  <svg className={`animate-spin ${className}`} fill="none" viewBox="0 0 24 24" {...props}>
     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
   </svg>
 );
 
-const AlertIcon = ({ className }: { className?: string }) => (
-  <svg className={className} fill="currentColor" viewBox="0 0 24 24">
+const AlertIcon = ({ className, ...props }: React.SVGProps<SVGSVGElement>) => (
+  <svg className={className} fill="currentColor" viewBox="0 0 24 24" {...props}>
     <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
   </svg>
 );
 
-const CheckIcon = ({ className }: { className?: string }) => (
-  <svg className={className} fill="currentColor" viewBox="0 0 24 24">
+const CheckIcon = ({ className, ...props }: React.SVGProps<SVGSVGElement>) => (
+  <svg className={className} fill="currentColor" viewBox="0 0 24 24" {...props}>
     <path d="M9 16.17L4.83 12l-1.42 1.42L9 19 21 7l-1.42-1.42z"/>
   </svg>
 );
 
-const CloudOffIcon = ({ className }: { className?: string }) => (
-  <svg className={className} fill="currentColor" viewBox="0 0 24 24">
+const CloudOffIcon = ({ className, ...props }: React.SVGProps<SVGSVGElement>) => (
+  <svg className={className} fill="currentColor" viewBox="0 0 24 24" {...props}>
     <path d="M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM3 5.27l2.28 2.28C6.15 6.69 8.83 6 12 6c1.66 0 3.14.69 4.22 1.78L19 5l1.41 1.41L3.41 23.41 2 22 3 5.27z"/>
   </svg>
 );
@@ -179,7 +182,7 @@ export const VoiceStatusIndicator: React.FC<VoiceStatusIndicatorProps> = ({
         };
       case 'error':
         return {
-          color: getStatusColor('error', theme),
+          color: theme.colors.error,
           icon: AlertIcon,
           label: 'Error',
           description: error || 'Voice AI error'
@@ -273,7 +276,7 @@ export const VoiceStatusIndicator: React.FC<VoiceStatusIndicatorProps> = ({
             }}
             title={tooltip ? statusInfo.description : undefined}
           >
-            <StatusIcon className="w-3 h-3 mr-1" />
+            <StatusIcon className="w-3 h-3 mr-1" color={statusInfo.color} />
             {showLabel && statusInfo.label}
           </div>
         );
@@ -294,7 +297,7 @@ export const VoiceStatusIndicator: React.FC<VoiceStatusIndicatorProps> = ({
               <div className="relative">
                 <StatusIcon 
                   className="w-5 h-5"
-                  style={{ color: statusInfo.color }}
+                  color={statusInfo.color}
                 />
                 {currentStatus === 'processing' && (
                   <div className="absolute inset-0 rounded-full border-2 border-current opacity-30 animate-ping" />
@@ -325,7 +328,7 @@ export const VoiceStatusIndicator: React.FC<VoiceStatusIndicatorProps> = ({
               <div className="mt-2 pt-2 border-t flex items-center justify-between" 
                    style={{ borderColor: theme.colors.border }}>
                 <div className="flex items-center space-x-2">
-                  <WifiIcon className="w-4 h-4" style={{ color: connectionInfo.color }} />
+                  <WifiIcon className="w-4 h-4" color={connectionInfo.color} />
                   <span className="text-xs" style={{ color: theme.colors.text.muted }}>
                     {connectionInfo.label}
                   </span>

@@ -8,7 +8,12 @@ import {
     SpeechProvider,
     ResponseMode,
     CommandDefinition,
-    HTTPMethod
+    HTTPMethod,
+    AIProviderConfig,
+    OpenAIConfig,
+    AnthropicConfig,
+    GoogleConfig,
+    KeywordsConfig
   } from './types';
   import { DEFAULT_COMMAND_REGISTRY } from './commands';
   
@@ -276,8 +281,8 @@ import {
   ): VoiceAIConfig {
     const roleConfig = ROLE_PRESETS[userRole];
     
-    // Default AI provider configuration
-    const getAIProviderConfig = () => {
+    // FIX: Properly typed AI provider configuration
+    const getAIProviderConfig = (): AIProviderConfig => {
       const provider = options.aiProvider || 'openai';
       
       switch (provider) {
@@ -286,24 +291,24 @@ import {
             provider: AIProvider.OPENAI,
             apiKey: options.aiApiKey || '',
             model: 'gpt-3.5-turbo'
-          };
+          } as OpenAIConfig;
         case 'anthropic':
           return {
             provider: AIProvider.ANTHROPIC,
             apiKey: options.aiApiKey || '',
             model: 'claude-3-haiku-20240307'
-          };
+          } as AnthropicConfig;
         case 'google':
           return {
             provider: AIProvider.GOOGLE,
             apiKey: options.aiApiKey || '',
             model: 'gemini-pro'
-          };
+          } as GoogleConfig;
         default:
           return {
             provider: AIProvider.KEYWORDS,
             fallbackMode: true
-          };
+          } as KeywordsConfig;
       }
     };
   
@@ -314,7 +319,7 @@ import {
       aiProviders: {
         primary: getAIProviderConfig(),
         fallbacks: [
-          { provider: AIProvider.KEYWORDS, fallbackMode: true }
+          { provider: AIProvider.KEYWORDS, fallbackMode: true } as KeywordsConfig
         ],
         retryAttempts: 2,
         timeoutMs: 5000
@@ -336,7 +341,8 @@ import {
       
       commands: {
         registry: {
-          commands: roleConfig.commands,
+          // FIX: Handle undefined commands with fallback
+          commands: roleConfig.commands || DEFAULT_COMMAND_REGISTRY.commands,
           categories: DEFAULT_COMMAND_REGISTRY.categories,
           aliases: DEFAULT_COMMAND_REGISTRY.aliases
         },

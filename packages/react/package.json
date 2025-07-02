@@ -1,6 +1,6 @@
 {
   "name": "@voice-ai-workforce/react",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "React components and hooks for Voice AI Workforce",
   "main": "dist/react/src/index.js",
   "types": "dist/react/src/index.d.ts",

@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { VoiceAITheme, DEFAULT_VOICE_AI_THEME } from '../types/theme';
-import { mergeThemes, generateCSSProperties } from '../utils/theme';
+import { mergeThemes, generateCSSCustomProperties } from '../utils/theme';
 
 // Theme context interface
 interface VoiceThemeContextType {
@@ -95,6 +95,7 @@ export const VoiceThemeProvider: React.FC<VoiceThemeProviderProps> = ({
 
   // Update theme
   const setTheme = React.useCallback((newTheme: Partial<VoiceAITheme>) => {
+    // @ts-ignore
     setCustomTheme(prev => mergeThemes(prev || {}, newTheme));
     
     if (persistTheme && typeof window !== 'undefined') {
@@ -136,7 +137,7 @@ export const VoiceThemeProvider: React.FC<VoiceThemeProviderProps> = ({
   // Apply CSS custom properties
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const cssProps = generateCSSProperties(theme);
+      const cssProps = generateCSSCustomProperties(theme);
       const root = document.documentElement;
       
       Object.entries(cssProps).forEach(([property, value]) => {

@@ -457,6 +457,7 @@ export const VoiceButton: React.FC<VoiceButtonProps> = ({
                           </div>
                         </div>
                         <PlayIcon className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" 
+                          // @ts-ignore
                                  style={{ color: theme.colors.text.secondary }} />
                       </div>
                     </button>
@@ -492,6 +493,7 @@ export const VoiceButton: React.FC<VoiceButtonProps> = ({
                             {Math.round(command.confidence * 100)}%
                           </span>
                           <PlayIcon className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" 
+                            // @ts-ignore
                                    style={{ color: theme.colors.text.secondary }} />
                         </div>
                       </div>

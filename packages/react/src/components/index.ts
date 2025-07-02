@@ -29,8 +29,6 @@ export type {
   VoiceAIPosition,
   VoiceAIStatusVariant,
   VoiceAIHistoryFilters,
-  VoiceButtonVariant,
-  VoiceButtonSize
 } from '../types/theme';
 
 // Re-export utilities

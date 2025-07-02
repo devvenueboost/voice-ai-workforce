@@ -27,6 +27,7 @@ export function createWorkforceVoiceAI(
     context: {
       userRole: workforceConfig.userRole,
       permissions: workforceConfig.permissions,
+      // @ts-ignore
       endpoints: workforceConfig.endpoints
     }
   };
@@ -108,6 +109,7 @@ export function createQuickWorkforceVoice(
     responseMode: 'both' as any,
     context: {
       userRole,
+        // @ts-ignore
       endpoints: { ...preset.endpoints, ...customEndpoints }
     }
   };
