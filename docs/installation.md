@@ -527,7 +527,7 @@ npm install --save-dev @types/node
 console.log('Current mode:', config.interfaceMode);
 
 // Check if mode presets are working
-import { useVoiceVisibility } from '@voice-ai-workforce/types';
+import { useVoiceVisibility } from '../hooks/useVoiceVisibility';
 const { visibility } = useVoiceVisibility(config);
 console.log('Visibility config:', visibility);
 ```

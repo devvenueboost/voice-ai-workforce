@@ -6,9 +6,9 @@ import {
   VoiceInterfaceMode, 
   VisibilityConfig, 
   CustomLabels,
-  useVoiceVisibility
 } from '../../../types/src/types';
-import { VoiceAITheme, VoiceAIThemeProps } from '../types/theme';
+import { VoiceAITheme } from '../types/theme';
+import { useVoiceVisibility } from '../hooks/useVoiceVisibility';
 
 // Default theme
 const defaultTheme: VoiceAITheme = {

@@ -605,10 +605,3 @@ export function useVoiceVisibility(
   return { visibility, labels };
 }
 
-// =====================================
-// EXPORTS
-// =====================================
-// @ts-ignore
-export * from './commands'; // We'll create this file for default commands
-// @ts-ignore
-export * from './presets';  // We'll create this file for role presets

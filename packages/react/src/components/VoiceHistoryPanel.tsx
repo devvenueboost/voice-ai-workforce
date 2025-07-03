@@ -2,12 +2,12 @@
 
 import React, { useState, useMemo } from 'react';
 import { useVoiceAI } from '../hooks/useVoiceAI';
+import { useVoiceVisibility } from '../hooks/useVoiceVisibility';
 import { useVoiceHistory } from '../hooks/useVoiceHistory';
 import { useComponentTheme } from './VoiceProvider';
 import { 
   VoiceAIConfig,
   VoiceModeProps,
-  useVoiceVisibility
 } from '../../../types/src/types';
 import { VoiceAIThemeProps, VoiceAIHistoryFilters } from '../types/theme';
 import { SIZE_CLASSES } from '../utils/theme';

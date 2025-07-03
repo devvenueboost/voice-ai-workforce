@@ -8,9 +8,9 @@ import {
     VoiceAIConfig,
     VoiceAIError,
     CommandDefinition,
-    useVoiceVisibility,
     VoiceModeProps
   } from '../../../types/src/types';
+  import { useVoiceVisibility } from '../hooks/useVoiceVisibility';
 
 // Enhanced props interface with mode support
 export interface VoiceCommandCenterPropsWithMode extends VoiceModeProps {

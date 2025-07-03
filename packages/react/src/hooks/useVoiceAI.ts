@@ -1,6 +1,6 @@
-// packages/react/src/hooks/useVoiceAI.ts
+// packages/react/src/hooks/useVoiceAI.ts - FIXED VERSION
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { VoiceAI } from '../../../core/src/VoiceAI';
 import { 
   VoiceAIConfig, 
@@ -10,9 +10,9 @@ import {
   VoiceAIError,
   VisibilityConfig,
   CustomLabels,
-  useVoiceVisibility,
   VoiceModeProps
 } from '../../../types/src/types';
+import { useVoiceVisibility } from './useVoiceVisibility';
 
 export interface UseVoiceAIOptions extends VoiceModeProps {
   config: VoiceAIConfig;
@@ -50,20 +50,29 @@ export interface UseVoiceAIReturn {
 }
 
 export function useVoiceAI(options: UseVoiceAIOptions): UseVoiceAIReturn {
-  // NEW: Resolve visibility and labels based on mode
-  const { visibility, labels } = useVoiceVisibility(
+  // NEW: Resolve visibility and labels based on mode - STABLE
+  const visibilityResult = useVoiceVisibility(
     options.config, 
     options.mode, 
     options.visibilityOverrides
   );
 
-  // Merge prop labels with resolved labels
-  const effectiveLabels = {
+  // STABLE reference to visibility and labels
+  const visibility = useMemo(() => visibilityResult.visibility, [
+    JSON.stringify(visibilityResult.visibility)
+  ]);
+  
+  const labels = useMemo(() => visibilityResult.labels, [
+    JSON.stringify(visibilityResult.labels)
+  ]);
+
+  // Merge prop labels with resolved labels - STABLE
+  const effectiveLabels = useMemo(() => ({
     voiceButton: { ...labels.voiceButton, ...options.customLabels?.voiceButton },
     status: { ...labels.status, ...options.customLabels?.status },
     providers: { ...labels.providers, ...options.customLabels?.providers },
     errors: { ...labels.errors, ...options.customLabels?.errors }
-  };
+  }), [labels, options.customLabels]);
 
   // Internal state
   const [state, setState] = useState<VoiceAIState>({
@@ -74,20 +83,42 @@ export function useVoiceAI(options: UseVoiceAIOptions): UseVoiceAIReturn {
 
   // Keep VoiceAI instance in ref to persist across renders
   const voiceAIRef = useRef<VoiceAI | null>(null);
+  // Track if we're initializing to prevent multiple instances
+  const initializingRef = useRef(false);
+  // Track cleanup to prevent memory leaks
+  const cleanupRef = useRef<(() => void) | null>(null);
 
-  // Helper function to filter errors based on visibility settings
+  // STABLE config to prevent unnecessary recreations - SIMPLIFIED
+  const stableConfigKey = useMemo(() => {
+    return JSON.stringify({
+      speechProvider: options.config.speechToText?.provider,
+      ttsProvider: options.config.textToSpeech?.provider,
+      aiProvider: options.config.aiProviders?.primary?.provider,
+      mode: options.mode || options.config.interfaceMode,
+      apiBaseUrl: options.config.apiBaseUrl
+    });
+  }, [
+    options.config.speechToText?.provider,
+    options.config.textToSpeech?.provider,
+    options.config.aiProviders?.primary?.provider,
+    options.mode,
+    options.config.interfaceMode,
+    options.config.apiBaseUrl
+  ]);
+
+  // Helper function to filter errors - STABLE
   const filterError = useCallback((error: VoiceAIError): VoiceAIError => {
     if (!visibility.showTechnicalErrors) {
       return {
         ...error,
         message: effectiveLabels.errors.generic || 'An error occurred',
-        details: undefined // Hide technical details
+        details: undefined
       };
     }
     return error;
   }, [visibility.showTechnicalErrors, effectiveLabels.errors.generic]);
 
-  // Helper function to get filtered error message for state
+  // Helper function to get filtered error message - STABLE
   const getFilteredErrorMessage = useCallback((error: VoiceAIError): string => {
     if (!visibility.showTechnicalErrors) {
       return effectiveLabels.errors.generic || 'An error occurred';
@@ -95,12 +126,114 @@ export function useVoiceAI(options: UseVoiceAIOptions): UseVoiceAIReturn {
     return error.message;
   }, [visibility.showTechnicalErrors, effectiveLabels.errors.generic]);
 
-  // Initialize VoiceAI instance
+  // STABLE event handlers - CRITICAL FIX
+  const stableHandlers = useMemo(() => ({
+    onCommand: (command: VoiceCommand) => {
+      // Filter command based on visibility
+      const processedCommand = {
+        ...command,
+        entities: visibility.showDebugInfo ? command.entities : {},
+        provider: visibility.showProviders ? command.provider : undefined
+      };
+      
+      setState(prev => ({ 
+        ...prev, 
+        currentCommand: processedCommand 
+      }));
+      
+      // Call external handler
+      options.onCommand?.(processedCommand);
+    },
+    
+    onResponse: (response: VoiceResponse) => {
+      // Filter response metadata based on visibility
+      const processedResponse: VoiceResponse = {
+        ...response,
+        metadata: visibility.showDebugInfo ? response.metadata : {
+          ...(visibility.showProviders && response.metadata?.provider && {
+            provider: response.metadata.provider
+          }),
+          ...(visibility.showConfidenceScores && response.metadata?.confidence && {
+            confidence: response.metadata.confidence
+          })
+        }
+      };
+
+      setState(prev => ({ 
+        ...prev, 
+        lastResponse: processedResponse 
+      }));
+      
+      // Call external handler
+      options.onResponse?.(processedResponse);
+    },
+    
+    onError: (error: VoiceAIError) => {
+      const filteredError = filterError(error);
+      const errorMessage = getFilteredErrorMessage(error);
+      
+      setState(prev => ({ 
+        ...prev, 
+        error: errorMessage 
+      }));
+      
+      // Call external handler
+      options.onError?.(filteredError);
+    },
+    
+    onStateChange: (newState: VoiceAIState) => {
+      // Filter state based on visibility settings
+      const filteredState: VoiceAIState = {
+        ...newState,
+        activeProvider: visibility.showProviders ? newState.activeProvider : undefined,
+        providerStatus: visibility.showProviderStatus ? newState.providerStatus : undefined,
+        commandHistory: visibility.showCommandHistory ? newState.commandHistory : [],
+        suggestedCommands: visibility.showAdvancedSettings ? newState.suggestedCommands : []
+      };
+
+      setState(filteredState);
+    }
+  }), [
+    visibility.showDebugInfo,
+    visibility.showProviders, 
+    visibility.showConfidenceScores,
+    visibility.showProviderStatus,
+    visibility.showCommandHistory,
+    visibility.showAdvancedSettings,
+    filterError,
+    getFilteredErrorMessage,
+    options.onCommand,
+    options.onResponse,
+    options.onError
+  ]);
+
+  // Initialize VoiceAI instance - FIXED TO PREVENT MEMORY LEAKS
   useEffect(() => {
+    let isMounted = true;
+    
     const initializeVoiceAI = async () => {
+      // Prevent multiple initializations
+      if (initializingRef.current) return;
+      initializingRef.current = true;
+
       try {
-        // Create mode-aware config
-        const modeAwareConfig: VoiceAIConfig = {
+        // Clean up existing instance FIRST
+        if (cleanupRef.current) {
+          cleanupRef.current();
+          cleanupRef.current = null;
+        }
+
+        if (voiceAIRef.current) {
+          try {
+            await voiceAIRef.current.stopListening();
+          } catch (e) {
+            console.warn('Error stopping previous instance:', e);
+          }
+          voiceAIRef.current = null;
+        }
+
+        // Create minimal config with mode-aware settings
+        const modeAwareConfig = {
           ...options.config,
           interfaceMode: options.mode || options.config.interfaceMode,
           visibility: {
@@ -113,113 +246,75 @@ export function useVoiceAI(options: UseVoiceAIOptions): UseVoiceAIReturn {
           }
         };
 
-        // Create VoiceAI instance with event handlers
-        voiceAIRef.current = new VoiceAI(modeAwareConfig, {
-          onCommand: (command: VoiceCommand) => {
-            // Filter command history based on visibility
-            const processedCommand = visibility.showCommandHistory ? command : {
-              ...command,
-              // Clear sensitive data if history is disabled
-              entities: visibility.showDebugInfo ? command.entities : {},
-              provider: visibility.showProviders ? command.provider : undefined
-            };
-            
-            setState(prev => ({ 
-              ...prev, 
-              currentCommand: processedCommand 
-            }));
-            options.onCommand?.(processedCommand);
-          },
-          onResponse: (response: VoiceResponse) => {
-            // Filter response metadata based on visibility
-            const processedResponse: VoiceResponse = {
-              ...response,
-              metadata: visibility.showDebugInfo ? response.metadata : {
-                // Only keep essential metadata
-                ...(visibility.showProviders && response.metadata?.provider && {
-                  provider: response.metadata.provider
-                }),
-                ...(visibility.showConfidenceScores && response.metadata?.confidence && {
-                  confidence: response.metadata.confidence
-                })
-              }
-            };
+        // Only proceed if component is still mounted
+        if (!isMounted) return;
 
-            setState(prev => ({ 
-              ...prev, 
-              lastResponse: processedResponse 
-            }));
-            options.onResponse?.(processedResponse);
-          },
-          onError: (error: VoiceAIError) => {
-            const filteredError = filterError(error);
-            const errorMessage = getFilteredErrorMessage(error);
-            
-            setState(prev => ({ 
-              ...prev, 
-              error: errorMessage 
-            }));
-            options.onError?.(filteredError);
-          },
-          onStateChange: (newState: VoiceAIState) => {
-            // Filter state based on visibility settings
-            const filteredState: VoiceAIState = {
-              ...newState,
-              // Filter provider information
-              activeProvider: visibility.showProviders ? newState.activeProvider : undefined,
-              providerStatus: visibility.showProviderStatus ? newState.providerStatus : undefined,
-              // Filter command history
-              commandHistory: visibility.showCommandHistory ? newState.commandHistory : [],
-              // Filter suggested commands based on advanced settings
-              suggestedCommands: visibility.showAdvancedSettings ? newState.suggestedCommands : []
-            };
+        // Create VoiceAI instance with stable handlers
+        voiceAIRef.current = new VoiceAI(modeAwareConfig, stableHandlers);
 
-            setState(filteredState);
+        // Set up cleanup function
+        cleanupRef.current = () => {
+          if (voiceAIRef.current) {
+            try {
+              voiceAIRef.current.stopListening().catch(console.warn);
+            } catch (e) {
+              console.warn('Cleanup error:', e);
+            }
+            voiceAIRef.current = null;
           }
-        });
-
-        // Auto-start if requested and if listening is available
-        if (options.autoStart && voiceAIRef.current && visibility.showMiniCenter !== false) {
-          await voiceAIRef.current.startListening();
-        }
-      } catch (error) {
-        const voiceError: VoiceAIError = {
-          code: 'INITIALIZATION_FAILED',
-          message: error instanceof Error ? error.message : 'Failed to initialize VoiceAI',
-          details: visibility.showTechnicalErrors ? error : undefined
         };
 
-        const filteredError = filterError(voiceError);
-        const errorMessage = getFilteredErrorMessage(voiceError);
+        // Update availability state
+        if (isMounted) {
+          setState(prev => ({ ...prev, isAvailable: true }));
+        }
 
-        setState(prev => ({ 
-          ...prev, 
-          error: errorMessage,
-          isAvailable: false 
-        }));
-        options.onError?.(filteredError);
+        // Auto-start if requested (but only for certain modes)
+        if (options.autoStart && voiceAIRef.current && visibility.showMiniCenter !== false && isMounted) {
+          try {
+            await voiceAIRef.current.startListening();
+          } catch (e) {
+            console.warn('Auto-start failed:', e);
+          }
+        }
+      } catch (error) {
+        console.error('VoiceAI initialization failed:', error);
+        
+        if (isMounted) {
+          const voiceError: VoiceAIError = {
+            code: 'INITIALIZATION_FAILED',
+            message: error instanceof Error ? error.message : 'Failed to initialize VoiceAI',
+            details: visibility.showTechnicalErrors ? error : undefined
+          };
+
+          const errorMessage = getFilteredErrorMessage(voiceError);
+          setState(prev => ({ 
+            ...prev, 
+            error: errorMessage,
+            isAvailable: false 
+          }));
+          
+          options.onError?.(filterError(voiceError));
+        }
+      } finally {
+        initializingRef.current = false;
       }
     };
 
     initializeVoiceAI();
 
-    // Cleanup on unmount
+    // Cleanup function
     return () => {
-      if (voiceAIRef.current) {
-        voiceAIRef.current.stopListening().catch(console.error);
+      isMounted = false;
+      if (cleanupRef.current) {
+        cleanupRef.current();
+        cleanupRef.current = null;
       }
+      initializingRef.current = false;
     };
-  }, [
-    options.config, 
-    options.autoStart, 
-    options.mode, 
-    visibility,
-    effectiveLabels,
-    filterError,
-    getFilteredErrorMessage
-  ]);
+  }, [stableConfigKey, JSON.stringify(stableHandlers)]); // SIMPLIFIED DEPENDENCIES
 
-  // Actions with mode-aware error handling
+  // Actions with stable references - CRITICAL FIX
   const startListening = useCallback(async () => {
     if (!voiceAIRef.current) return;
     
@@ -235,7 +330,6 @@ export function useVoiceAI(options: UseVoiceAIOptions): UseVoiceAIReturn {
       const errorMessage = getFilteredErrorMessage(voiceError);
       setState(prev => ({ ...prev, error: errorMessage }));
       
-      // Don't call onError for user-facing operation failures in end-user mode
       if (visibility.showTechnicalErrors) {
         options.onError?.(filterError(voiceError));
       }
@@ -268,8 +362,6 @@ export function useVoiceAI(options: UseVoiceAIOptions): UseVoiceAIReturn {
     
     try {
       const response = await voiceAIRef.current.processTextInput(text);
-      
-      // Filter response based on visibility
       if (!response) return undefined;
       
       return {
@@ -324,8 +416,7 @@ export function useVoiceAI(options: UseVoiceAIOptions): UseVoiceAIReturn {
   const updateConfig = useCallback((newConfig: Partial<VoiceAIConfig>) => {
     if (!voiceAIRef.current) return;
     
-    // Merge with mode-aware settings
-    const modeAwareConfig = {
+    const updatedConfig = {
       ...newConfig,
       interfaceMode: options.mode || newConfig.interfaceMode || options.config.interfaceMode,
       visibility: {
@@ -334,13 +425,12 @@ export function useVoiceAI(options: UseVoiceAIOptions): UseVoiceAIReturn {
       }
     };
     
-    voiceAIRef.current.updateConfig(modeAwareConfig);
+    voiceAIRef.current.updateConfig(updatedConfig);
   }, [options.mode, options.config.interfaceMode, visibility]);
 
   const updateContext = useCallback((context: Record<string, any>) => {
     if (!voiceAIRef.current) return;
     
-    // Filter context based on visibility settings
     const filteredContext = visibility.showDebugInfo 
       ? context 
       : Object.fromEntries(
@@ -355,7 +445,6 @@ export function useVoiceAI(options: UseVoiceAIOptions): UseVoiceAIReturn {
   const getState = useCallback((): VoiceAIState => {
     const currentState = voiceAIRef.current?.getState() || state;
     
-    // Filter state based on visibility settings
     return {
       ...currentState,
       activeProvider: visibility.showProviders ? currentState.activeProvider : undefined,

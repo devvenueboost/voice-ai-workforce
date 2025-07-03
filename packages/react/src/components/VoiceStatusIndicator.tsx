@@ -2,14 +2,14 @@
 
 import React, { useEffect, useState } from 'react';
 import { useVoiceAI } from '../hooks/useVoiceAI';
-import { useComponentTheme, useVoiceContext } from './VoiceProvider';
+import { useComponentTheme } from './VoiceProvider';
 import { 
   VoiceAIConfig,
   VoiceModeProps,
-  useVoiceVisibility
 } from '../../../types/src/types';
 import { VoiceAIThemeProps } from '../types/theme';
 import { getStatusColor } from '../utils/theme';
+import { useVoiceVisibility } from '../hooks/useVoiceVisibility';
 
 // Status variant type specifically for this component
 type VoiceStatusVariant = 'dot' | 'minimal' | 'badge' | 'full';

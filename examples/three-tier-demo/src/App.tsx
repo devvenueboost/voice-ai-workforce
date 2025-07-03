@@ -2,7 +2,16 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { VoiceButton } from '../../../packages/react/src/components/VoiceButton';
 import { VoiceCommandCenter } from '../../../packages/react/src/components/VoiceCommandCenter';
-import { VoiceCommand, VoiceResponse, VoiceAIConfig, UserRole, VoiceInterfaceMode } from '../../../packages/types/src/types';
+import { 
+  VoiceCommand, 
+  VoiceResponse, 
+  VoiceAIConfig, 
+  UserRole, 
+  VoiceInterfaceMode,
+  AIProvider,
+  SpeechProvider,
+  ResponseMode
+} from '../../../packages/types/src/types';
 
 // Command history interface
 interface CommandHistoryItem {
@@ -29,22 +38,27 @@ function App() {
   // Refs for auto-scrolling
   const historyRef = useRef<HTMLDivElement>(null);
 
-  // Base voice AI configuration
+  // Base voice AI configuration - FIXED
   const baseVoiceConfig: Omit<VoiceAIConfig, 'interfaceMode' | 'visibility'> = {
+    // REQUIRED: Add aiProviders
+    apiBaseUrl: 'https://demo.api.com', // Demo URL since we're using keywords
+
+    aiProviders: {
+      primary: {
+        provider: AIProvider.KEYWORDS,
+        fallbackMode: true
+      }
+    },
     speechToText: {
-      provider: 'web-speech' as any,
+      provider: SpeechProvider.WEB_SPEECH,
       language: 'en-US',
       continuous: false
     },
     textToSpeech: {
-      provider: 'web-speech' as any,
+      provider: SpeechProvider.WEB_SPEECH,
       speed: 1.0
     },
-    aiProvider: {
-      provider: 'openai' as any,
-      model: 'gpt-3.5-turbo'
-    },
-    responseMode: 'both' as any,
+    responseMode: ResponseMode.BOTH,
     context: {
       userRole: UserRole.FIELD_WORKER,
       // @ts-ignore
@@ -119,19 +133,19 @@ function App() {
             ? "I can help you clock in, clock out, and complete tasks. Just ask!"
             : selectedMode === 'project'
             ? "Available commands: clock in/out, complete tasks, check status. Confidence tracking enabled."
-            : "Debug Mode: Available intents=['help','clock_in','clock_out','complete_task','get_status']. Provider=OpenAI, Processing time will be shown.",
+            : "Debug Mode: Available intents=['help','clock_in','clock_out','complete_task','get_status']. Provider=Keywords, Processing time will be shown.",
           success: true,
           data: {
             availableCommands: ['clock in', 'clock out', 'complete task', 'status', 'help'],
             mode: selectedMode
           },
           metadata: selectedMode === 'developer' ? {
-            provider: 'openai' as any,
+            provider: AIProvider.KEYWORDS,
             confidence: 0.98,
             processingTime: 125,
             cached: false
           } : selectedMode === 'project' ? {
-            provider: 'openai' as any,
+            provider: AIProvider.KEYWORDS,
             confidence: 0.98
           } : undefined
         };
@@ -148,7 +162,7 @@ function App() {
             success: false,
             data: { reason: 'already_logged_in', mode: selectedMode },
             metadata: selectedMode === 'developer' ? {
-              provider: 'openai' as any,
+              provider: AIProvider.KEYWORDS,
               confidence: 0.95,
               processingTime: 89,
               cached: false
@@ -172,7 +186,7 @@ function App() {
               mode: selectedMode
             },
             metadata: selectedMode === 'developer' ? {
-              provider: 'openai' as any,
+              provider: AIProvider.KEYWORDS,
               confidence: 0.92,
               processingTime: 156,
               cached: false
@@ -194,7 +208,7 @@ function App() {
             success: false,
             data: { reason: 'not_logged_in', mode: selectedMode },
             metadata: selectedMode === 'developer' ? {
-              provider: 'openai' as any,
+              provider: AIProvider.KEYWORDS,
               confidence: 0.94,
               processingTime: 76,
               cached: false
@@ -216,7 +230,7 @@ function App() {
               mode: selectedMode
             },
             metadata: selectedMode === 'developer' ? {
-              provider: 'openai' as any,
+              provider: AIProvider.KEYWORDS,
               confidence: 0.91,
               processingTime: 134,
               cached: false
@@ -243,7 +257,7 @@ function App() {
             mode: selectedMode
           },
           metadata: selectedMode === 'developer' ? {
-            provider: 'openai' as any,
+            provider: AIProvider.KEYWORDS,
             confidence: command.confidence || 0.87,
             processingTime: 198,
             cached: false
@@ -268,7 +282,7 @@ function App() {
             mode: selectedMode
           },
           metadata: selectedMode === 'developer' ? {
-            provider: 'openai' as any,
+            provider: AIProvider.KEYWORDS,
             confidence: 0.99,
             processingTime: 45,
             cached: true
@@ -292,7 +306,7 @@ function App() {
             mode: selectedMode
           },
           metadata: selectedMode === 'developer' ? {
-            provider: 'openai' as any,
+            provider: AIProvider.KEYWORDS,
             confidence: command.confidence || 0.1,
             processingTime: 67,
             cached: false
@@ -352,7 +366,7 @@ function App() {
       confidence: 0.9,
       rawText: textInput,
       timestamp: new Date(),
-      provider: selectedMode === 'developer' ? 'openai' as any : undefined
+      provider: selectedMode === 'developer' ? AIProvider.KEYWORDS : undefined
     };
 
     const response = processCommand(command, 'text');
@@ -534,7 +548,7 @@ function App() {
                   <>
                     <div className="flex items-center space-x-2">
                       <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                      <span>Provider information (OpenAI)</span>
+                      <span>Provider information (Keywords)</span>
                     </div>
                     <div className="flex items-center space-x-2">
                       <span className="w-2 h-2 bg-green-500 rounded-full"></span>
@@ -555,7 +569,7 @@ function App() {
                   <>
                     <div className="flex items-center space-x-2">
                       <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
-                      <span>Provider status (OpenAI)</span>
+                      <span>Provider status (Keywords)</span>
                     </div>
                     <div className="flex items-center space-x-2">
                       <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
@@ -721,181 +735,181 @@ function App() {
           <div className="space-y-6">
             <div className="bg-white rounded-xl shadow-lg p-6">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-semibold">
-                  {selectedMode === 'end-user' ? 'Recent Requests' : 'Command History'}
-                </h2>
-                <button
-                  onClick={clearHistory}
-                  className="px-3 py-1 text-sm text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
-                >
-                  Clear
-                </button>
-              </div>
+              <h2 className="text-xl font-semibold">
+                 {selectedMode === 'end-user' ? 'Recent Requests' : 'Command History'}
+               </h2>
+               <button
+                 onClick={clearHistory}
+                 className="px-3 py-1 text-sm text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
+               >
+                 Clear
+               </button>
+             </div>
 
-              <div 
-                ref={historyRef}
-                className="h-96 overflow-y-auto space-y-3 border border-gray-200 rounded-lg p-3"
-              >
-                {commandHistory.length === 0 ? (
-                  <div className="text-center text-gray-500 py-8">
-                    <p>No commands yet.</p>
-                    <p className="text-sm">
-                      {selectedMode === 'end-user' 
-                        ? 'Try asking for help above!'
-                        : 'Try using voice or text input to see mode differences!'
-                      }
-                    </p>
-                  </div>
-                ) : (
-                  commandHistory.map((item) => (
-                    <div key={item.id} className="border-b border-gray-100 pb-3 last:border-b-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <div className="flex items-center space-x-2">
-                          <span className={`text-xs px-2 py-1 rounded ${
-                            item.source === 'voice' 
-                              ? 'bg-blue-100 text-blue-700' 
-                              : 'bg-gray-100 text-gray-700'
-                          }`}>
-                            {item.source === 'voice' ? '🎤 Voice' : '⌨️ Text'}
-                          </span>
-                          <span className={`text-xs px-2 py-1 rounded ${
-                            item.mode === 'developer' ? 'bg-gray-100 text-gray-700' :
-                            item.mode === 'project' ? 'bg-blue-100 text-blue-700' :
-                            'bg-green-100 text-green-700'
-                          }`}>
-                            {item.mode === 'developer' ? '🔧' : 
-                             item.mode === 'project' ? '🏢' : '👤'} {item.mode}
-                          </span>
-                        </div>
-                        <span className="text-xs text-gray-500">
-                          {item.timestamp.toLocaleTimeString()}
-                        </span>
-                      </div>
-                      
-                      <div className="text-sm">
-                        <p className="font-medium text-gray-900">
-                          "{item.command.rawText}"
-                        </p>
-                        {item.response && (
-                          <p className={`mt-1 ${
-                            item.response.success ? 'text-green-700' : 'text-red-700'
-                          }`}>
-                            → {item.response.text}
-                          </p>
-                        )}
-                        
-                        {/* Mode-specific metadata display */}
-                        {selectedMode === 'developer' && item.response?.metadata && (
-                          <div className="mt-2 text-xs text-gray-500 bg-gray-50 p-2 rounded">
-                            <div>Provider: {item.response.metadata.provider}</div>
-                            <div>Confidence: {((item.response.metadata.confidence || 0) * 100).toFixed(1)}%</div>
-                            <div>Processing: {item.response.metadata.processingTime}ms</div>
-                            <div>Cached: {item.response.metadata.cached ? 'Yes' : 'No'}</div>
-                          </div>
-                        )}
-                        
-                        {selectedMode === 'project' && item.response?.metadata && (
-                          <div className="mt-2 text-xs text-gray-500">
-                            {item.response.metadata.provider && (
-                              <span>Provider: {item.response.metadata.provider} | </span>
-                            )}
-                            {item.response.metadata.confidence && (
-                              <span>Confidence: {((item.response.metadata.confidence || 0) * 100).toFixed(0)}%</span>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
+             <div 
+               ref={historyRef}
+               className="h-96 overflow-y-auto space-y-3 border border-gray-200 rounded-lg p-3"
+             >
+               {commandHistory.length === 0 ? (
+                 <div className="text-center text-gray-500 py-8">
+                   <p>No commands yet.</p>
+                   <p className="text-sm">
+                     {selectedMode === 'end-user' 
+                       ? 'Try asking for help above!'
+                       : 'Try using voice or text input to see mode differences!'
+                     }
+                   </p>
+                 </div>
+               ) : (
+                 commandHistory.map((item) => (
+                   <div key={item.id} className="border-b border-gray-100 pb-3 last:border-b-0">
+                     <div className="flex items-center justify-between mb-1">
+                       <div className="flex items-center space-x-2">
+                         <span className={`text-xs px-2 py-1 rounded ${
+                           item.source === 'voice' 
+                             ? 'bg-blue-100 text-blue-700' 
+                             : 'bg-gray-100 text-gray-700'
+                         }`}>
+                           {item.source === 'voice' ? '🎤 Voice' : '⌨️ Text'}
+                         </span>
+                         <span className={`text-xs px-2 py-1 rounded ${
+                           item.mode === 'developer' ? 'bg-gray-100 text-gray-700' :
+                           item.mode === 'project' ? 'bg-blue-100 text-blue-700' :
+                           'bg-green-100 text-green-700'
+                         }`}>
+                           {item.mode === 'developer' ? '🔧' : 
+                            item.mode === 'project' ? '🏢' : '👤'} {item.mode}
+                         </span>
+                       </div>
+                       <span className="text-xs text-gray-500">
+                         {item.timestamp.toLocaleTimeString()}
+                       </span>
+                     </div>
+                     
+                     <div className="text-sm">
+                       <p className="font-medium text-gray-900">
+                         "{item.command.rawText}"
+                       </p>
+                       {item.response && (
+                         <p className={`mt-1 ${
+                           item.response.success ? 'text-green-700' : 'text-red-700'
+                         }`}>
+                           → {item.response.text}
+                         </p>
+                       )}
+                       
+                       {/* Mode-specific metadata display */}
+                       {selectedMode === 'developer' && item.response?.metadata && (
+                         <div className="mt-2 text-xs text-gray-500 bg-gray-50 p-2 rounded">
+                           <div>Provider: {item.response.metadata.provider}</div>
+                           <div>Confidence: {((item.response.metadata.confidence || 0) * 100).toFixed(1)}%</div>
+                           <div>Processing: {item.response.metadata.processingTime}ms</div>
+                           <div>Cached: {item.response.metadata.cached ? 'Yes' : 'No'}</div>
+                         </div>
+                       )}
+                       
+                       {selectedMode === 'project' && item.response?.metadata && (
+                         <div className="mt-2 text-xs text-gray-500">
+                           {item.response.metadata.provider && (
+                             <span>Provider: {item.response.metadata.provider} | </span>
+                           )}
+                           {item.response.metadata.confidence && (
+                             <span>Confidence: {((item.response.metadata.confidence || 0) * 100).toFixed(0)}%</span>
+                           )}
+                         </div>
+                       )}
+                     </div>
+                   </div>
+                 ))
+               )}
+             </div>
+           </div>
 
-            {/* Mode Statistics */}
-            <div className="bg-white rounded-xl shadow-lg p-6">
-              <h3 className="text-lg font-semibold mb-3">Session Stats</h3>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span>Total Commands:</span>
-                  <span className="font-medium">{commandHistory.length}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Current Mode:</span>
-                  <span className="font-medium capitalize">{selectedMode}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Voice Commands:</span>
-                  <span className="font-medium">
-                    {commandHistory.filter(h => h.source === 'voice').length}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Text Commands:</span>
-                  <span className="font-medium">
-                    {commandHistory.filter(h => h.source === 'text').length}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Success Rate:</span>
-                  <span className="font-medium">
-                    {commandHistory.length > 0 
-                      ? Math.round((commandHistory.filter(h => h.response?.success).length / commandHistory.length) * 100)
-                      : 0
-                    }%
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+           {/* Mode Statistics */}
+           <div className="bg-white rounded-xl shadow-lg p-6">
+             <h3 className="text-lg font-semibold mb-3">Session Stats</h3>
+             <div className="space-y-2 text-sm">
+               <div className="flex justify-between">
+                 <span>Total Commands:</span>
+                 <span className="font-medium">{commandHistory.length}</span>
+               </div>
+               <div className="flex justify-between">
+                 <span>Current Mode:</span>
+                 <span className="font-medium capitalize">{selectedMode}</span>
+               </div>
+               <div className="flex justify-between">
+                 <span>Voice Commands:</span>
+                 <span className="font-medium">
+                   {commandHistory.filter(h => h.source === 'voice').length}
+                 </span>
+               </div>
+               <div className="flex justify-between">
+                 <span>Text Commands:</span>
+                 <span className="font-medium">
+                   {commandHistory.filter(h => h.source === 'text').length}
+                 </span>
+               </div>
+               <div className="flex justify-between">
+                 <span>Success Rate:</span>
+                 <span className="font-medium">
+                   {commandHistory.length > 0 
+                     ? Math.round((commandHistory.filter(h => h.response?.success).length / commandHistory.length) * 100)
+                     : 0
+                   }%
+                 </span>
+               </div>
+             </div>
+           </div>
+         </div>
+       </div>
 
-        {/* Command Center Modal */}
-        {showCommandCenter && selectedMode !== 'end-user' && (
-          <VoiceCommandCenter
-            config={voiceConfig}
-            isOpen={showCommandCenter}
-            onClose={() => setShowCommandCenter(false)}
-            position="right"
-            width={400}
-            showCategories={selectedMode === 'developer'}
-            showHistory={true}
-            onCommand={handleVoiceCommand}
-            onResponse={handleVoiceResponse}
-            onError={handleVoiceError}
-          />
-        )}
+       {/* Command Center Modal */}
+       {showCommandCenter && selectedMode !== 'end-user' && (
+         <VoiceCommandCenter
+           config={voiceConfig}
+           isOpen={showCommandCenter}
+           onClose={() => setShowCommandCenter(false)}
+           position="right"
+           width={400}
+           showCategories={selectedMode === 'developer'}
+           showHistory={true}
+           onCommand={handleVoiceCommand}
+           onResponse={handleVoiceResponse}
+           onError={handleVoiceError}
+         />
+       )}
 
-        {/* Footer */}
-        <div className="mt-8 text-center text-sm text-gray-500">
-          <div className="max-w-4xl mx-auto">
-            <p className="mb-2">
-              <strong>Voice AI Workforce - 3-Tier Interface Demo</strong>
-            </p>
-            <p className="mb-2">
-              This demo shows how the same voice commands provide different levels of information based on user type:
-            </p>
-            <div className="grid md:grid-cols-3 gap-4 mt-4">
-              <div className="bg-gray-100 p-3 rounded-lg">
-                <strong>🔧 Developer Mode</strong><br />
-                Full debug info, processing times, provider details, technical errors
-              </div>
-              <div className="bg-blue-100 p-3 rounded-lg">
-                <strong>🏢 Project Mode</strong><br />
-                Business settings, confidence scores, provider status, user-friendly errors
-              </div>
-              <div className="bg-green-100 p-3 rounded-lg">
-                <strong>👤 End-User Mode</strong><br />
-                Clean interface, friendly language, no technical jargon
-              </div>
-            </div>
-            <p className="mt-4">
-              <strong>Try the same command in different modes to see the differences!</strong>
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+       {/* Footer */}
+       <div className="mt-8 text-center text-sm text-gray-500">
+         <div className="max-w-4xl mx-auto">
+           <p className="mb-2">
+             <strong>Voice AI Workforce - 3-Tier Interface Demo</strong>
+           </p>
+           <p className="mb-2">
+             This demo shows how the same voice commands provide different levels of information based on user type:
+           </p>
+           <div className="grid md:grid-cols-3 gap-4 mt-4">
+             <div className="bg-gray-100 p-3 rounded-lg">
+               <strong>🔧 Developer Mode</strong><br />
+               Full debug info, processing times, provider details, technical errors
+             </div>
+             <div className="bg-blue-100 p-3 rounded-lg">
+               <strong>🏢 Project Mode</strong><br />
+               Business settings, confidence scores, provider status, user-friendly errors
+             </div>
+             <div className="bg-green-100 p-3 rounded-lg">
+               <strong>👤 End-User Mode</strong><br />
+               Clean interface, friendly language, no technical jargon
+             </div>
+           </div>
+           <p className="mt-4">
+             <strong>Try the same command in different modes to see the differences!</strong>
+           </p>
+         </div>
+       </div>
+     </div>
+   </div>
+ );
 }
 
 export default App;
