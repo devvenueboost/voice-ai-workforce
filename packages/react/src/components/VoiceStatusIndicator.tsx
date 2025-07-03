@@ -2,25 +2,31 @@
 
 import React, { useEffect, useState } from 'react';
 import { useVoiceAI } from '../hooks/useVoiceAI';
-import { useComponentTheme } from '../hooks/useVoiceTheme';
-import { VoiceAIConfig } from '../../../types/src/types';
+import { useComponentTheme, useVoiceContext } from './VoiceProvider';
+import { 
+  VoiceAIConfig,
+  VoiceModeProps,
+  useVoiceVisibility
+} from '../../../types/src/types';
 import { VoiceAIThemeProps } from '../types/theme';
 import { getStatusColor } from '../utils/theme';
 
 // Status variant type specifically for this component
 type VoiceStatusVariant = 'dot' | 'minimal' | 'badge' | 'full';
 
-// Props interface
-export interface VoiceStatusIndicatorProps extends Omit<VoiceAIThemeProps, 'variant'> {
+// Props interface with mode support
+export interface VoiceStatusIndicatorProps extends Omit<VoiceAIThemeProps, 'variant'>, VoiceModeProps {
   config: VoiceAIConfig;
   variant?: VoiceStatusVariant;
-  showProvider?: boolean;
-  showConnection?: boolean;
-  showLabel?: boolean;
   autoUpdate?: boolean;
   updateInterval?: number;
   onClick?: () => void;
   tooltip?: boolean;
+  
+  // Legacy props - now controlled by visibility config
+  showProvider?: boolean;
+  showConnection?: boolean;
+  showLabel?: boolean;
 }
 
 // Status type
@@ -71,9 +77,6 @@ const CloudOffIcon = ({ className, ...props }: React.SVGProps<SVGSVGElement>) =>
 export const VoiceStatusIndicator: React.FC<VoiceStatusIndicatorProps> = ({
   config,
   variant = 'badge',
-  showProvider = false,
-  showConnection = true,
-  showLabel = true,
   autoUpdate = true,
   updateInterval = 5000,
   onClick,
@@ -82,11 +85,37 @@ export const VoiceStatusIndicator: React.FC<VoiceStatusIndicatorProps> = ({
   size = 'md',
   className = '',
   style,
+  
+  // Legacy props - now controlled by visibility
+  showProvider,
+  showConnection,
+  showLabel,
+  
+  // NEW: Mode support props
+  mode,
+  visibilityOverrides,
+  customLabels: propCustomLabels,
   ...props
 }) => {
   const theme = useComponentTheme(customTheme);
   const [connectionQuality, setConnectionQuality] = useState<ConnectionQuality>('good');
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+
+  // NEW: Resolve visibility and labels based on mode
+  const { visibility, labels } = useVoiceVisibility(config, mode, visibilityOverrides);
+  
+  // Merge prop labels with resolved labels
+  const effectiveLabels = {
+    voiceButton: { ...labels.voiceButton, ...propCustomLabels?.voiceButton },
+    status: { ...labels.status, ...propCustomLabels?.status },
+    providers: { ...labels.providers, ...propCustomLabels?.providers },
+    errors: { ...labels.errors, ...propCustomLabels?.errors }
+  };
+
+  // Determine what to show based on mode and legacy props
+  const shouldShowProvider = showProvider !== undefined ? showProvider : visibility.showProviders;
+  const shouldShowConnection = showConnection !== undefined ? showConnection : visibility.showProviderStatus;
+  const shouldShowLabel = showLabel !== undefined ? showLabel : !visibility.useGenericLabels;
 
   // Voice AI state
   const {
@@ -156,43 +185,43 @@ export const VoiceStatusIndicator: React.FC<VoiceStatusIndicatorProps> = ({
     };
   }, [autoUpdate, updateInterval]);
 
-  // Get status display info
+  // Get status display info using effective labels
   const getStatusInfo = () => {
     switch (currentStatus) {
       case 'online':
         return {
           color: getStatusColor('online', theme),
           icon: CheckIcon,
-          label: 'Online',
+          label: effectiveLabels.status.online || 'Online',
           description: 'Voice AI is ready'
         };
       case 'listening':
         return {
           color: getStatusColor('listening', theme),
           icon: MicrophoneIcon,
-          label: 'Listening',
+          label: effectiveLabels.status.listening || 'Listening',
           description: 'Listening for voice input'
         };
       case 'processing':
         return {
           color: getStatusColor('processing', theme),
           icon: LoadingSpinner,
-          label: 'Processing',
+          label: effectiveLabels.status.processing || 'Processing',
           description: 'Processing voice command'
         };
       case 'error':
         return {
           color: theme.colors.error,
           icon: AlertIcon,
-          label: 'Error',
-          description: error || 'Voice AI error'
+          label: effectiveLabels.status.error || 'Error',
+          description: visibility.showTechnicalErrors ? (error || 'Voice AI error') : effectiveLabels.errors.generic
         };
       case 'offline':
       default:
         return {
           color: getStatusColor('offline', theme),
           icon: CloudOffIcon,
-          label: 'Offline',
+          label: effectiveLabels.status.offline || 'Offline',
           description: 'Voice AI is not available'
         };
     }
@@ -256,7 +285,7 @@ export const VoiceStatusIndicator: React.FC<VoiceStatusIndicatorProps> = ({
               className="w-2 h-2 rounded-full"
               style={{ backgroundColor: statusInfo.color }}
             />
-            {showLabel && (
+            {shouldShowLabel && (
               <span className="text-xs font-medium" style={{ color: theme.colors.text.secondary }}>
                 {statusInfo.label}
               </span>
@@ -276,8 +305,8 @@ export const VoiceStatusIndicator: React.FC<VoiceStatusIndicatorProps> = ({
             }}
             title={tooltip ? statusInfo.description : undefined}
           >
-            <StatusIcon className="w-3 h-3 mr-1" color={statusInfo.color} />
-            {showLabel && statusInfo.label}
+            <StatusIcon className="w-3 h-3 mr-1" style={{ color: statusInfo.color }} />
+            {shouldShowLabel && statusInfo.label}
           </div>
         );
 
@@ -297,7 +326,7 @@ export const VoiceStatusIndicator: React.FC<VoiceStatusIndicatorProps> = ({
               <div className="relative">
                 <StatusIcon 
                   className="w-5 h-5"
-                  color={statusInfo.color}
+                  style={{ color: statusInfo.color }}
                 />
                 {currentStatus === 'processing' && (
                   <div className="absolute inset-0 rounded-full border-2 border-current opacity-30 animate-ping" />
@@ -314,21 +343,24 @@ export const VoiceStatusIndicator: React.FC<VoiceStatusIndicatorProps> = ({
               </div>
             </div>
 
-            {/* Provider Info */}
-            {showProvider && state.activeProvider && (
+            {/* Provider Info - only show if visibility allows */}
+            {shouldShowProvider && state.activeProvider && (
               <div className="mt-2 pt-2 border-t" style={{ borderColor: theme.colors.border }}>
                 <div className="text-xs" style={{ color: theme.colors.text.muted }}>
-                  Provider: <span className="font-medium">{state.activeProvider}</span>
+                  {visibility.showProviders 
+                    ? `Provider: ${state.activeProvider}`
+                    : effectiveLabels.providers.generic
+                  }
                 </div>
               </div>
             )}
 
-            {/* Connection Info */}
-            {showConnection && (
+            {/* Connection Info - only show if visibility allows */}
+            {shouldShowConnection && (
               <div className="mt-2 pt-2 border-t flex items-center justify-between" 
                    style={{ borderColor: theme.colors.border }}>
                 <div className="flex items-center space-x-2">
-                  <WifiIcon className="w-4 h-4" color={connectionInfo.color} />
+                  <WifiIcon className="w-4 h-4" style={{ color: connectionInfo.color }} />
                   <span className="text-xs" style={{ color: theme.colors.text.muted }}>
                     {connectionInfo.label}
                   </span>
@@ -352,10 +384,12 @@ export const VoiceStatusIndicator: React.FC<VoiceStatusIndicatorProps> = ({
               </div>
             )}
 
-            {/* Last Update */}
-            <div className="mt-2 text-xs text-center" style={{ color: theme.colors.text.muted }}>
-              Updated {lastUpdate.toLocaleTimeString()}
-            </div>
+            {/* Last Update - only show if not in end-user mode */}
+            {!visibility.useGenericLabels && (
+              <div className="mt-2 text-xs text-center" style={{ color: theme.colors.text.muted }}>
+                Updated {lastUpdate.toLocaleTimeString()}
+              </div>
+            )}
           </div>
         );
     }

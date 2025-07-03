@@ -1,19 +1,30 @@
-// packages/react/src/components/VoiceButton.tsx
+// packages/react/src/components/VoiceButton.tsx - Updated with Mode Support
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useVoiceAI } from '../hooks/useVoiceAI';
 import { useComponentTheme } from '../hooks/useVoiceTheme';
 import { useVoiceHistory } from '../hooks/useVoiceHistory';
-import { VoiceCommand, VoiceResponse, VoiceAIConfig, VoiceAIError, CommandDefinition } from '../../../types/src/types';
+import { 
+  VoiceCommand, 
+  VoiceResponse, 
+  VoiceAIConfig, 
+  VoiceAIError, 
+  CommandDefinition,
+  VoiceInterfaceMode,
+  VisibilityConfig,
+  CustomLabels,
+  useVoiceVisibility,
+  VoiceModeProps
+} from '../../../types/src/types';
 import { VoiceAIThemeProps, VoiceAIPosition, VoiceAISize, VoiceAIVariant } from '../types/theme';
 import { SIZE_CLASSES, POSITION_CLASSES, ANIMATION_CLASSES } from '../utils/theme';
 
-// Extended props interface
-export interface VoiceButtonProps extends VoiceAIThemeProps {
+// Extended props interface with mode support
+export interface VoiceButtonProps extends VoiceAIThemeProps, VoiceModeProps {
   // Core configuration
   config: VoiceAIConfig;
   
-  // Mini center functionality
+  // Mini center functionality - now mode-aware
   showMiniCenter?: boolean;
   miniCenterPosition?: VoiceAIPosition;
   quickCommands?: string[];
@@ -30,7 +41,7 @@ export interface VoiceButtonProps extends VoiceAIThemeProps {
   onError?: (error: VoiceAIError) => void;
   onMiniCenterToggle?: (isOpen: boolean) => void;
   
-  // Custom content
+  // Custom content - now mode-aware
   children?: React.ReactNode;
   listenText?: string;
   stopText?: string;
@@ -42,7 +53,7 @@ export interface VoiceButtonProps extends VoiceAIThemeProps {
 // Default quick commands
 const DEFAULT_QUICK_COMMANDS = ['help', 'status', 'clock in', 'clock out'];
 
-// Icons (using simple SVG for now)
+// Icons (keeping existing ones)
 const MicrophoneIcon = ({ className }: { className?: string }) => (
   <svg className={className} fill="currentColor" viewBox="0 0 24 24">
     <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
@@ -100,15 +111,35 @@ export const VoiceButton: React.FC<VoiceButtonProps> = ({
   onError,
   onMiniCenterToggle,
   children,
-  listenText = 'Start Listening',
-  stopText = 'Stop Listening',
+  listenText,
+  stopText,
   'aria-label': ariaLabel,
+  
+  // NEW: Mode support props
+  mode,
+  visibilityOverrides,
+  customLabels: propCustomLabels,
   ...props
 }) => {
   const theme = useComponentTheme(customTheme);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const miniCenterRef = useRef<HTMLDivElement>(null);
   const autoCloseTimeoutRef = useRef<NodeJS.Timeout>();
+  
+  // NEW: Resolve visibility and labels based on mode
+  const { visibility, labels } = useVoiceVisibility(config, mode, visibilityOverrides);
+  
+  // Merge prop labels with resolved labels
+  const effectiveLabels = {
+    voiceButton: { ...labels.voiceButton, ...propCustomLabels?.voiceButton },
+    status: { ...labels.status, ...propCustomLabels?.status },
+    providers: { ...labels.providers, ...propCustomLabels?.providers },
+    errors: { ...labels.errors, ...propCustomLabels?.errors }
+  };
+  
+  // Use effective labels with fallbacks to props
+  const finalListenText = listenText || effectiveLabels.voiceButton.startText || 'Start Listening';
+  const finalStopText = stopText || effectiveLabels.voiceButton.stopText || 'Stop Listening';
   
   // State
   const [isMiniCenterOpen, setIsMiniCenterOpen] = useState(false);
@@ -128,20 +159,31 @@ export const VoiceButton: React.FC<VoiceButtonProps> = ({
     config,
     onCommand: (command) => {
       onCommand?.(command);
-      if (showMiniCenter && autoCloseMiniCenter) {
+      if (visibility.showMiniCenter && showMiniCenter && autoCloseMiniCenter) {
         scheduleAutoClose();
       }
     },
     onResponse,
-    onError,
+    onError: (error) => {
+      // Filter error based on visibility settings
+      let filteredError = error;
+      if (!visibility.showTechnicalErrors) {
+        filteredError = {
+          ...error,
+          message: effectiveLabels.errors.generic || 'An error occurred',
+          details: undefined // Hide technical details
+        };
+      }
+      onError?.(filteredError);
+    },
     autoStart: false
   });
 
   // History hook
   const { getRecentCommands, replayCommand } = useVoiceHistory();
 
-  // Get recent commands and quick commands
-  const recentCommands = getRecentCommands(maxRecentCommands);
+  // Get recent commands and quick commands (filtered based on visibility)
+  const recentCommands = visibility.showCommandHistory ? getRecentCommands(maxRecentCommands) : [];
   const availableCommands = config.commands?.registry?.commands || [];
   const quickCommandDefs = quickCommands
     .map(cmdName => availableCommands.find(cmd => 
@@ -174,7 +216,8 @@ export const VoiceButton: React.FC<VoiceButtonProps> = ({
     
     if (disabled || !isAvailable) return;
     
-    if (showMiniCenter && !isListening) {
+    // Check if mini center should be shown (respects visibility settings)
+    if (visibility.showMiniCenter && showMiniCenter && !isListening) {
       // Toggle mini center
       const newOpen = !isMiniCenterOpen;
       setIsMiniCenterOpen(newOpen);
@@ -192,10 +235,14 @@ export const VoiceButton: React.FC<VoiceButtonProps> = ({
           await startListening();
         }
       } catch (err) {
+        const errorMessage = !visibility.showTechnicalErrors 
+          ? effectiveLabels.errors.generic || 'Voice operation failed'
+          : err instanceof Error ? err.message : 'Voice operation failed';
+          
         onError?.({
           code: 'VOICE_OPERATION_FAILED',
-          message: err instanceof Error ? err.message : 'Voice operation failed',
-          details: err
+          message: errorMessage,
+          details: visibility.showTechnicalErrors ? err : undefined
         });
       }
     }
@@ -214,10 +261,14 @@ export const VoiceButton: React.FC<VoiceButtonProps> = ({
         setIsMiniCenterOpen(false);
       }
     } catch (err) {
+      const errorMessage = !visibility.showTechnicalErrors 
+        ? effectiveLabels.errors.generic || 'Command failed'
+        : 'Failed to execute command';
+        
       onError?.({
         code: 'COMMAND_EXECUTION_FAILED',
-        message: 'Failed to execute command',
-        details: err
+        message: errorMessage,
+        details: visibility.showTechnicalErrors ? err : undefined
       });
     }
   };
@@ -234,10 +285,14 @@ export const VoiceButton: React.FC<VoiceButtonProps> = ({
         }
       }
     } catch (err) {
+      const errorMessage = !visibility.showTechnicalErrors 
+        ? effectiveLabels.errors.generic || 'Replay failed'
+        : 'Failed to replay command';
+        
       onError?.({
         code: 'COMMAND_REPLAY_FAILED',
-        message: 'Failed to replay command',
-        details: err
+        message: errorMessage,
+        details: visibility.showTechnicalErrors ? err : undefined
       });
     }
   };
@@ -254,10 +309,14 @@ export const VoiceButton: React.FC<VoiceButtonProps> = ({
         }
       }
     } catch (err) {
+      const errorMessage = !visibility.showTechnicalErrors 
+        ? effectiveLabels.errors.generic || 'Voice toggle failed'
+        : err instanceof Error ? err.message : 'Voice operation failed';
+        
       onError?.({
         code: 'VOICE_OPERATION_FAILED',
-        message: err instanceof Error ? err.message : 'Voice operation failed',
-        details: err
+        message: errorMessage,
+        details: visibility.showTechnicalErrors ? err : undefined
       });
     }
   };
@@ -331,12 +390,12 @@ export const VoiceButton: React.FC<VoiceButtonProps> = ({
     return <MicrophoneIcon className="w-1/2 h-1/2" />;
   };
 
-  // Accessibility label
+  // Accessibility label - use effective labels
   const accessibilityLabel = ariaLabel || (
-    isListening ? stopText : 
-    isProcessing ? 'Processing voice...' :
-    error ? `Voice error: ${error}` :
-    listenText
+    isListening ? finalStopText : 
+    isProcessing ? (effectiveLabels.voiceButton.processingText || 'Processing voice...') :
+    error ? (effectiveLabels.voiceButton.errorText || `Voice error: ${error}`) :
+    finalListenText
   );
 
   return (
@@ -351,7 +410,7 @@ export const VoiceButton: React.FC<VoiceButtonProps> = ({
         disabled={disabled || !isAvailable}
         aria-label={accessibilityLabel}
         aria-pressed={isListening}
-        aria-expanded={showMiniCenter ? isMiniCenterOpen : undefined}
+        aria-expanded={visibility.showMiniCenter && showMiniCenter ? isMiniCenterOpen : undefined}
         title={accessibilityLabel}
         {...props}
       >
@@ -368,14 +427,14 @@ export const VoiceButton: React.FC<VoiceButtonProps> = ({
           <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white" />
         )}
         
-        {/* Mini center indicator */}
-        {showMiniCenter && !isListening && !isProcessing && (
+        {/* Mini center indicator - only show if visibility allows */}
+        {visibility.showMiniCenter && showMiniCenter && !isListening && !isProcessing && (
           <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-blue-500 rounded-full border-2 border-white" />
         )}
       </button>
 
-      {/* Mini Command Center */}
-      {showMiniCenter && isMiniCenterOpen && (
+      {/* Mini Command Center - only render if visibility allows */}
+      {visibility.showMiniCenter && showMiniCenter && isMiniCenterOpen && (
         <div
           ref={miniCenterRef}
           className={`absolute z-50 ${POSITION_CLASSES[miniCenterPosition]} ${ANIMATION_CLASSES.fadeIn}`}
@@ -399,7 +458,7 @@ export const VoiceButton: React.FC<VoiceButtonProps> = ({
                   onClick={handleVoiceToggle}
                   className="p-1 rounded hover:bg-gray-100 transition-colors"
                   style={{ color: isListening ? theme.colors.status.listening : theme.colors.text.secondary }}
-                  title={isListening ? 'Stop Listening' : 'Start Listening'}
+                  title={isListening ? finalStopText : finalListenText}
                 >
                   {isListening ? <StopIcon className="w-4 h-4" /> : <MicrophoneIcon className="w-4 h-4" />}
                 </button>
@@ -416,7 +475,7 @@ export const VoiceButton: React.FC<VoiceButtonProps> = ({
               </div>
             </div>
 
-            {/* Tabs */}
+            {/* Tabs - only show recent if history is visible */}
             <div className="flex space-x-1 mb-3">
               <button
                 onClick={() => setMiniCenterTab('quick')}
@@ -426,14 +485,16 @@ export const VoiceButton: React.FC<VoiceButtonProps> = ({
               >
                 Quick
               </button>
-              <button
-                onClick={() => setMiniCenterTab('recent')}
-                className={`px-3 py-1 text-xs rounded transition-colors ${
-                  miniCenterTab === 'recent' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                Recent
-              </button>
+              {visibility.showCommandHistory && (
+                <button
+                  onClick={() => setMiniCenterTab('recent')}
+                  className={`px-3 py-1 text-xs rounded transition-colors ${
+                    miniCenterTab === 'recent' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'
+                  }`}
+                >
+                  Recent
+                </button>
+              )}
             </div>
 
             {/* Content */}
@@ -457,8 +518,8 @@ export const VoiceButton: React.FC<VoiceButtonProps> = ({
                           </div>
                         </div>
                         <PlayIcon className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" 
-                          // @ts-ignore
-                                 style={{ color: theme.colors.text.secondary }} />
+                        // @ts-ignore
+                          style={{ color: theme.colors.text.secondary }} />
                       </div>
                     </button>
                   ))}
@@ -471,7 +532,7 @@ export const VoiceButton: React.FC<VoiceButtonProps> = ({
                 </>
               )}
 
-              {miniCenterTab === 'recent' && (
+              {miniCenterTab === 'recent' && visibility.showCommandHistory && (
                 <>
                   {recentCommands.map((command) => (
                     <button
@@ -489,11 +550,14 @@ export const VoiceButton: React.FC<VoiceButtonProps> = ({
                           </div>
                         </div>
                         <div className="flex items-center space-x-1">
-                          <span className="text-xs" style={{ color: theme.colors.text.muted }}>
-                            {Math.round(command.confidence * 100)}%
-                          </span>
+                          {/* Only show confidence if visibility allows */}
+                          {visibility.showConfidenceScores && (
+                            <span className="text-xs" style={{ color: theme.colors.text.muted }}>
+                              {Math.round(command.confidence * 100)}%
+                            </span>
+                          )}
                           <PlayIcon className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" 
-                            // @ts-ignore
+                          //@ts-ignore
                                    style={{ color: theme.colors.text.secondary }} />
                         </div>
                       </div>
@@ -509,14 +573,19 @@ export const VoiceButton: React.FC<VoiceButtonProps> = ({
               )}
             </div>
 
-            {/* Status Footer */}
-            <div className="mt-3 pt-3 border-t flex items-center justify-between text-xs" 
-                 style={{ borderColor: theme.colors.border, color: theme.colors.text.muted }}>
-              <span>
-                Provider: {getState().activeProvider || 'Unknown'}
-              </span>
-              <span className={`w-2 h-2 rounded-full ${isAvailable ? 'bg-green-500' : 'bg-red-500'}`} />
-            </div>
+            {/* Status Footer - only show if visibility allows */}
+            {(visibility.showProviderStatus || visibility.showStatusIndicator) && (
+              <div className="mt-3 pt-3 border-t flex items-center justify-between text-xs" 
+                   style={{ borderColor: theme.colors.border, color: theme.colors.text.muted }}>
+                <span>
+                  {visibility.showProviders && getState().activeProvider 
+                    ? `Provider: ${getState().activeProvider}`
+                    : effectiveLabels.providers.generic
+                  }
+                </span>
+                <span className={`w-2 h-2 rounded-full ${isAvailable ? 'bg-green-500' : 'bg-red-500'}`} />
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -3,21 +3,27 @@
 import React, { useState, useMemo } from 'react';
 import { useVoiceAI } from '../hooks/useVoiceAI';
 import { useVoiceHistory } from '../hooks/useVoiceHistory';
-import { useComponentTheme } from '../hooks/useVoiceTheme';
-import { VoiceAIConfig } from '../../../types/src/types';
+import { useComponentTheme } from './VoiceProvider';
+import { 
+  VoiceAIConfig,
+  VoiceModeProps,
+  useVoiceVisibility
+} from '../../../types/src/types';
 import { VoiceAIThemeProps, VoiceAIHistoryFilters } from '../types/theme';
 import { SIZE_CLASSES } from '../utils/theme';
 
-// Props interface
-export interface VoiceHistoryPanelProps extends VoiceAIThemeProps {
+// Props interface with mode support
+export interface VoiceHistoryPanelProps extends VoiceAIThemeProps, VoiceModeProps {
   config: VoiceAIConfig;
   maxItems?: number;
+  onCommandReplay?: (commandId: string) => void;
+  onHistoryChange?: (historyLength: number) => void;
+  
+  // Legacy props - now controlled by visibility config
   showFilters?: boolean;
   showSearch?: boolean;
   showStats?: boolean;
   showExport?: boolean;
-  onCommandReplay?: (commandId: string) => void;
-  onHistoryChange?: (historyLength: number) => void;
 }
 
 // Icons
@@ -81,23 +87,60 @@ const CloseIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
+const HistoryIcon = ({ className }: { className?: string }) => (
+  <svg className={className} fill="currentColor" viewBox="0 0 24 24">
+    <path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/>
+  </svg>
+);
+
 export const VoiceHistoryPanel: React.FC<VoiceHistoryPanelProps> = ({
   config,
   maxItems = 50,
-  showFilters = true,
-  showSearch = true,
-  showStats = true,
-  showExport = true,
   onCommandReplay,
   onHistoryChange,
   theme: customTheme,
   size = 'md',
   className = '',
   style,
+  
+  // Legacy props - now controlled by visibility
+  showFilters,
+  showSearch,
+  showStats,
+  showExport,
+  
+  // NEW: Mode support props
+  mode,
+  visibilityOverrides,
+  customLabels: propCustomLabels,
   ...props
 }) => {
   const theme = useComponentTheme(customTheme);
-  const [activeTab, setActiveTab] = useState<'history' | 'stats'>('history');
+  
+  // NEW: Resolve visibility and labels based on mode
+  const { visibility, labels } = useVoiceVisibility(config, mode, visibilityOverrides);
+  
+  // Merge prop labels with resolved labels
+  const effectiveLabels = {
+    voiceButton: { ...labels.voiceButton, ...propCustomLabels?.voiceButton },
+    status: { ...labels.status, ...propCustomLabels?.status },
+    providers: { ...labels.providers, ...propCustomLabels?.providers },
+    errors: { ...labels.errors, ...propCustomLabels?.errors }
+  };
+
+  // Determine what features to show based on mode and legacy props
+  const shouldShowFilters = showFilters !== undefined ? showFilters : visibility.showAdvancedSettings;
+  const shouldShowSearch = showSearch !== undefined ? showSearch : true; // Always show search
+  const shouldShowStats = showStats !== undefined ? showStats : visibility.showAnalytics;
+  const shouldShowExport = showExport !== undefined ? showExport : visibility.showExportOptions;
+
+  // Available tabs based on visibility
+  const availableTabs = [
+    { id: 'history', label: 'History', icon: HistoryIcon, visible: true },
+    { id: 'stats', label: 'Analytics', icon: StatsIcon, visible: shouldShowStats }
+  ].filter(tab => tab.visible);
+
+  const [activeTab, setActiveTab] = useState<'history' | 'stats'>(availableTabs[0]?.id as any || 'history');
   const [showFilterPanel, setShowFilterPanel] = useState(false);
 
   // Voice AI for command processing
@@ -191,7 +234,7 @@ export const VoiceHistoryPanel: React.FC<VoiceHistoryPanelProps> = ({
 
   const panelClasses = [
     'bg-white rounded-lg border shadow-sm',
-    SIZE_CLASSES.panel[size],
+    SIZE_CLASSES.panel?.[size] || 'w-96 max-h-96',
     className
   ].filter(Boolean).join(' ');
 
@@ -209,34 +252,30 @@ export const VoiceHistoryPanel: React.FC<VoiceHistoryPanelProps> = ({
       <div className="flex items-center justify-between p-4 border-b" 
            style={{ borderColor: theme.colors.border }}>
         <h3 className="text-lg font-semibold" style={{ color: theme.colors.text.primary }}>
-          Voice History
+          {visibility.useGenericLabels ? 'Command History' : 'Voice History'}
         </h3>
         
         <div className="flex items-center space-x-2">
-          {/* Tab buttons */}
-          {showStats && (
+          {/* Tab buttons - only show if there are multiple tabs */}
+          {availableTabs.length > 1 && (
             <>
-              <button
-                onClick={() => setActiveTab('history')}
-                className={`px-3 py-1 text-sm rounded transition-colors ${
-                  activeTab === 'history' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                History
-              </button>
-              <button
-                onClick={() => setActiveTab('stats')}
-                className={`px-3 py-1 text-sm rounded transition-colors ${
-                  activeTab === 'stats' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                Stats
-              </button>
+              {availableTabs.map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as any)}
+                  className={`flex items-center space-x-1 px-3 py-1 text-sm rounded transition-colors ${
+                    activeTab === tab.id ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'
+                  }`}
+                >
+                  <tab.icon className="w-4 h-4" />
+                  <span>{tab.label}</span>
+                </button>
+              ))}
             </>
           )}
           
           {/* Action buttons */}
-          {showExport && (
+          {shouldShowExport && (
             <div className="relative group">
               <button
                 className="p-2 rounded hover:bg-gray-100 transition-colors"
@@ -277,13 +316,13 @@ export const VoiceHistoryPanel: React.FC<VoiceHistoryPanelProps> = ({
       </div>
 
       {/* Search and Filters */}
-      {(showSearch || showFilters) && activeTab === 'history' && (
+      {(shouldShowSearch || shouldShowFilters) && activeTab === 'history' && (
         <div className="p-4 border-b space-y-3" style={{ borderColor: theme.colors.border }}>
           {/* Search */}
-          {showSearch && (
+          {shouldShowSearch && (
             <div className="relative">
               <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" 
-                // @ts-ignore
+                            //@ts-ignore
                           style={{ color: theme.colors.text.muted }} />
               <input
                 type="text"
@@ -302,7 +341,7 @@ export const VoiceHistoryPanel: React.FC<VoiceHistoryPanelProps> = ({
                   onClick={() => setSearchQuery('')}
                   className="absolute right-3 top-1/2 transform -translate-y-1/2"
                 >
-                      {/* @ts-ignore */}
+                    {/* @ts-ignore */}
                   <ClearIcon className="w-4 h-4" style={{ color: theme.colors.text.muted }} />
                 </button>
               )}
@@ -310,7 +349,7 @@ export const VoiceHistoryPanel: React.FC<VoiceHistoryPanelProps> = ({
           )}
 
           {/* Filter Controls */}
-          {showFilters && (
+          {shouldShowFilters && (
             <div className="flex items-center space-x-2">
               <button
                 onClick={() => setShowFilterPanel(!showFilterPanel)}
@@ -335,7 +374,7 @@ export const VoiceHistoryPanel: React.FC<VoiceHistoryPanelProps> = ({
           )}
 
           {/* Filter Panel */}
-          {showFilters && showFilterPanel && (
+          {shouldShowFilters && showFilterPanel && (
             <div className="grid grid-cols-2 gap-3 p-3 bg-gray-50 rounded-lg"
                  style={{ backgroundColor: theme.colors.background }}>
               {/* Date Range */}
@@ -397,29 +436,31 @@ export const VoiceHistoryPanel: React.FC<VoiceHistoryPanelProps> = ({
                 </select>
               </div>
               
-              {/* Provider Filter */}
-              <div>
-                <label className="block text-xs font-medium mb-1" style={{ color: theme.colors.text.secondary }}>
-                  Provider
-                </label>
-                <select
-                  value={filters.provider || 'all'}
-                  onChange={(e) => setFilters({ 
-                    provider: e.target.value === 'all' ? undefined : e.target.value
-                  })}
-                  className="w-full px-2 py-1 text-xs border rounded"
-                  style={{ 
-                    backgroundColor: theme.colors.surface,
-                    borderColor: theme.colors.border
-                  }}
-                >
-                  <option value="all">All Providers</option>
-                  <option value="openai">OpenAI</option>
-                  <option value="anthropic">Anthropic</option>
-                  <option value="google">Google</option>
-                  <option value="keywords">Keywords</option>
-                </select>
-              </div>
+              {/* Provider Filter - only show if visibility allows */}
+              {visibility.showProviders && (
+                <div>
+                  <label className="block text-xs font-medium mb-1" style={{ color: theme.colors.text.secondary }}>
+                    Provider
+                  </label>
+                  <select
+                    value={filters.provider || 'all'}
+                    onChange={(e) => setFilters({ 
+                      provider: e.target.value === 'all' ? undefined : e.target.value
+                    })}
+                    className="w-full px-2 py-1 text-xs border rounded"
+                    style={{ 
+                      backgroundColor: theme.colors.surface,
+                      borderColor: theme.colors.border
+                    }}
+                  >
+                    <option value="all">All Providers</option>
+                    <option value="openai">OpenAI</option>
+                    <option value="anthropic">Anthropic</option>
+                    <option value="google">Google</option>
+                    <option value="keywords">Keywords</option>
+                  </select>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -437,7 +478,9 @@ export const VoiceHistoryPanel: React.FC<VoiceHistoryPanelProps> = ({
                 <div className="text-sm" style={{ color: theme.colors.text.muted }}>
                   {searchQuery || Object.keys(filters).length > 0 
                     ? 'No commands match your search'
-                    : 'No voice commands yet'
+                    : visibility.useGenericLabels 
+                      ? 'No commands yet'
+                      : 'No voice commands yet'
                   }
                 </div>
               </div>
@@ -469,15 +512,21 @@ export const VoiceHistoryPanel: React.FC<VoiceHistoryPanelProps> = ({
                                 <span className="font-medium text-sm" style={{ color: theme.colors.text.primary }}>
                                   {entry.intent}
                                 </span>
-                                <span 
-                                  className="px-2 py-0.5 text-xs rounded-full"
-                                  style={{ 
-                                    backgroundColor: `${getConfidenceColor(entry.confidence)}20`,
-                                    color: getConfidenceColor(entry.confidence)
-                                  }}
-                                >
-                                  {Math.round(entry.confidence * 100)}%
-                                </span>
+                                
+                                {/* Confidence Score - only show if visibility allows */}
+                                {visibility.showConfidenceScores && (
+                                  <span 
+                                    className="px-2 py-0.5 text-xs rounded-full"
+                                    style={{ 
+                                      backgroundColor: `${getConfidenceColor(entry.confidence)}20`,
+                                      color: getConfidenceColor(entry.confidence)
+                                    }}
+                                  >
+                                    {Math.round(entry.confidence * 100)}%
+                                  </span>
+                                )}
+                                
+                                {/* Success/Failure indicator */}
                                 {entry.success ? (
                                     // @ts-ignore
                                   <CheckIcon className="w-3 h-3" style={{ color: theme.colors.success }} />
@@ -493,10 +542,14 @@ export const VoiceHistoryPanel: React.FC<VoiceHistoryPanelProps> = ({
                               
                               <div className="flex items-center space-x-3 text-xs" style={{ color: theme.colors.text.muted }}>
                                 <span>{formatRelativeTime(entry.timestamp)}</span>
-                                {entry.provider && (
+                                
+                                {/* Provider info - only show if visibility allows */}
+                                {entry.provider && visibility.showProviders && (
                                   <span>via {entry.provider}</span>
                                 )}
-                                {entry.duration && (
+                                
+                                {/* Processing time - only show if visibility allows */}
+                                {entry.duration && visibility.showProcessingTimes && (
                                   <span>{entry.duration}ms</span>
                                 )}
                               </div>
@@ -509,17 +562,21 @@ export const VoiceHistoryPanel: React.FC<VoiceHistoryPanelProps> = ({
                                 className="p-1 rounded hover:bg-gray-200 transition-colors"
                                 title="Replay Command"
                               >
-                                  {/* @ts-ignore */}
+                                {/* @ts-ignore */}
                                 <PlayIcon className="w-4 h-4" style={{ color: theme.colors.text.secondary }} />
                               </button>
-                              <button
-                                onClick={() => removeCommand(entry.id)}
-                                className="p-1 rounded hover:bg-gray-200 transition-colors"
-                                title="Remove"
-                              >
-                                {/* @ts-ignore */}
-                                <DeleteIcon className="w-4 h-4" style={{ color: theme.colors.text.secondary }} />
-                              </button>
+                              
+                              {/* Delete button - only show in advanced modes */}
+                              {visibility.showAdvancedSettings && (
+                                <button
+                                  onClick={() => removeCommand(entry.id)}
+                                  className="p-1 rounded hover:bg-gray-200 transition-colors"
+                                  title="Remove"
+                                >
+                                    {/* @ts-ignore */}
+                                  <DeleteIcon className="w-4 h-4" style={{ color: theme.colors.text.secondary }} />
+                                </button>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -531,93 +588,101 @@ export const VoiceHistoryPanel: React.FC<VoiceHistoryPanelProps> = ({
             )}
           </div>
         ) : (
-          // Stats Tab
-          <div className="p-4 space-y-4">
-            {/* Overview Stats */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="text-center p-3 bg-gray-50 rounded-lg"
-                   style={{ backgroundColor: theme.colors.background }}>
-                <div className="text-2xl font-bold" style={{ color: theme.colors.text.primary }}>
-                  {stats.totalCommands}
+          // Stats Tab - only shown if analytics are enabled
+          shouldShowStats && (
+            <div className="p-4 space-y-4">
+              {/* Overview Stats */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="text-center p-3 bg-gray-50 rounded-lg"
+                     style={{ backgroundColor: theme.colors.background }}>
+                  <div className="text-2xl font-bold" style={{ color: theme.colors.text.primary }}>
+                    {stats.totalCommands}
+                  </div>
+                  <div className="text-sm" style={{ color: theme.colors.text.secondary }}>
+                    Total Commands
+                  </div>
                 </div>
-                <div className="text-sm" style={{ color: theme.colors.text.secondary }}>
-                  Total Commands
+                
+                <div className="text-center p-3 bg-gray-50 rounded-lg"
+                     style={{ backgroundColor: theme.colors.background }}>
+                  <div className="text-2xl font-bold" style={{ color: theme.colors.success }}>
+                    {Math.round((stats.successfulCommands / stats.totalCommands) * 100) || 0}%
+                  </div>
+                  <div className="text-sm" style={{ color: theme.colors.text.secondary }}>
+                    Success Rate
+                  </div>
                 </div>
+                
+                {/* Confidence - only show if visibility allows */}
+                {visibility.showConfidenceScores && (
+                  <div className="text-center p-3 bg-gray-50 rounded-lg"
+                       style={{ backgroundColor: theme.colors.background }}>
+                    <div className="text-2xl font-bold" style={{ color: theme.colors.text.primary }}>
+                      {Math.round(stats.averageConfidence * 100)}%
+                    </div>
+                    <div className="text-sm" style={{ color: theme.colors.text.secondary }}>
+                      Avg Confidence
+                    </div>
+                  </div>
+                )}
+                
+                {/* Response Time - only show if visibility allows */}
+                {visibility.showProcessingTimes && (
+                  <div className="text-center p-3 bg-gray-50 rounded-lg"
+                       style={{ backgroundColor: theme.colors.background }}>
+                    <div className="text-2xl font-bold" style={{ color: theme.colors.text.primary }}>
+                      {Math.round(stats.averageResponseTime)}ms
+                    </div>
+                    <div className="text-sm" style={{ color: theme.colors.text.secondary }}>
+                      Avg Response Time
+                    </div>
+                  </div>
+                )}
               </div>
-              
-              <div className="text-center p-3 bg-gray-50 rounded-lg"
-                   style={{ backgroundColor: theme.colors.background }}>
-                <div className="text-2xl font-bold" style={{ color: theme.colors.success }}>
-                  {Math.round((stats.successfulCommands / stats.totalCommands) * 100) || 0}%
+
+              {/* Most Used Commands */}
+              {stats.mostUsedCommands.length > 0 && (
+                <div>
+                  <h4 className="font-medium mb-2" style={{ color: theme.colors.text.primary }}>
+                    Most Used Commands
+                  </h4>
+                  <div className="space-y-2">
+                    {stats.mostUsedCommands.slice(0, 5).map((command, index) => (
+                      <div key={command.intent} className="flex items-center justify-between py-1">
+                        <span className="text-sm" style={{ color: theme.colors.text.secondary }}>
+                          {index + 1}. {command.intent}
+                        </span>
+                        <span className="text-sm font-medium" style={{ color: theme.colors.text.primary }}>
+                          {command.count}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <div className="text-sm" style={{ color: theme.colors.text.secondary }}>
-                  Success Rate
+              )}
+
+              {/* Provider Breakdown - only show if visibility allows */}
+              {visibility.showProviders && Object.keys(stats.commandsByProvider).length > 0 && (
+                <div>
+                  <h4 className="font-medium mb-2" style={{ color: theme.colors.text.primary }}>
+                    By Provider
+                  </h4>
+                  <div className="space-y-2">
+                    {Object.entries(stats.commandsByProvider).map(([provider, count]) => (
+                      <div key={provider} className="flex items-center justify-between py-1">
+                        <span className="text-sm capitalize" style={{ color: theme.colors.text.secondary }}>
+                          {provider}
+                        </span>
+                        <span className="text-sm font-medium" style={{ color: theme.colors.text.primary }}>
+                          {count} ({Math.round((count / stats.totalCommands) * 100)}%)
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-              
-              <div className="text-center p-3 bg-gray-50 rounded-lg"
-                   style={{ backgroundColor: theme.colors.background }}>
-                <div className="text-2xl font-bold" style={{ color: theme.colors.text.primary }}>
-                  {Math.round(stats.averageConfidence * 100)}%
-                </div>
-                <div className="text-sm" style={{ color: theme.colors.text.secondary }}>
-                  Avg Confidence
-                </div>
-              </div>
-              
-              <div className="text-center p-3 bg-gray-50 rounded-lg"
-                   style={{ backgroundColor: theme.colors.background }}>
-                <div className="text-2xl font-bold" style={{ color: theme.colors.text.primary }}>
-                  {Math.round(stats.averageResponseTime)}ms
-                </div>
-                <div className="text-sm" style={{ color: theme.colors.text.secondary }}>
-                  Avg Response Time
-                </div>
-              </div>
+              )}
             </div>
-
-            {/* Most Used Commands */}
-            {stats.mostUsedCommands.length > 0 && (
-              <div>
-                <h4 className="font-medium mb-2" style={{ color: theme.colors.text.primary }}>
-                  Most Used Commands
-                </h4>
-                <div className="space-y-2">
-                  {stats.mostUsedCommands.slice(0, 5).map((command, index) => (
-                    <div key={command.intent} className="flex items-center justify-between py-1">
-                      <span className="text-sm" style={{ color: theme.colors.text.secondary }}>
-                        {index + 1}. {command.intent}
-                      </span>
-                      <span className="text-sm font-medium" style={{ color: theme.colors.text.primary }}>
-                        {command.count}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Provider Breakdown */}
-            {Object.keys(stats.commandsByProvider).length > 0 && (
-              <div>
-                <h4 className="font-medium mb-2" style={{ color: theme.colors.text.primary }}>
-                  By Provider
-                </h4>
-                <div className="space-y-2">
-                  {Object.entries(stats.commandsByProvider).map(([provider, count]) => (
-                    <div key={provider} className="flex items-center justify-between py-1">
-                      <span className="text-sm capitalize" style={{ color: theme.colors.text.secondary }}>
-                        {provider}
-                      </span>
-                      <span className="text-sm font-medium" style={{ color: theme.colors.text.primary }}>
-                        {count} ({Math.round((count / stats.totalCommands) * 100)}%)
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
+          )
         )}
       </div>
     </div>
