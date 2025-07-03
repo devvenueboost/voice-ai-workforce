@@ -3,69 +3,103 @@
 import { CommandDefinition, CommandCategory, HTTPMethod } from './types';
 
 // =====================================
-// DEFAULT COMMAND CATEGORIES
+// ENHANCED COMMAND CATEGORIES
 // =====================================
 
 export const DEFAULT_CATEGORIES: CommandCategory[] = [
   {
     id: 'timesheet',
     name: 'Time Tracking',
-    description: 'Clock in/out and manage work time',
+    description: 'Advanced time management and reporting',
     icon: '⏰',
     color: '#3B82F6',
-    commands: ['clock_in', 'clock_out', 'break_start', 'break_end', 'overtime_start']
+    commands: ['clock_in', 'clock_out', 'break_start', 'break_end', 'overtime_start', 'generate_timesheet', 'time_status']
   },
   {
     id: 'tasks',
     name: 'Task Management',
-    description: 'Complete and manage tasks',
+    description: 'Complete task operations and automation',
     icon: '✅',
     color: '#10B981',
-    commands: ['complete_task', 'start_task', 'get_tasks', 'assign_task']
+    commands: ['complete_task', 'complete_task_number', 'start_task', 'get_tasks', 'assign_task', 'auto_assign_tasks', 'task_status']
+  },
+  {
+    id: 'reports',
+    name: 'Reports & Analytics',
+    description: 'Generate comprehensive reports and insights',
+    icon: '📈',
+    color: '#8B5CF6',
+    commands: ['daily_report', 'weekly_report', 'project_report', 'team_performance', 'productivity_report']
   },
   {
     id: 'communication',
     name: 'Communication',
-    description: 'Send messages and reports',
+    description: 'Team communication and notifications',
     icon: '💬',
-    color: '#8B5CF6',
-    commands: ['send_message', 'report_issue', 'call_supervisor', 'team_status']
+    color: '#EC4899',
+    commands: ['send_message', 'report_issue', 'call_supervisor', 'team_status', 'broadcast_message', 'emergency_alert']
   },
   {
     id: 'status',
-    name: 'Status & Reports',
-    description: 'Check status and generate reports',
+    name: 'Status & Monitoring',
+    description: 'Real-time status and progress tracking',
     icon: '📊',
     color: '#F59E0B',
-    commands: ['get_status', 'project_status', 'daily_report', 'team_report']
+    commands: ['get_status', 'project_status', 'team_status', 'task_status', 'system_status']
   },
   {
     id: 'help',
     name: 'Help & Support',
-    description: 'Get help and information',
+    description: 'Advanced help and system information',
     icon: '❓',
     color: '#6B7280',
-    commands: ['help', 'commands_list', 'tutorial', 'contact_support']
+    commands: ['help', 'commands_list', 'tutorial', 'contact_support', 'voice_tips']
   }
 ];
 
 // =====================================
-// DEFAULT COMMANDS
+// ENHANCED COMMANDS
 // =====================================
 
 export const DEFAULT_COMMANDS: CommandDefinition[] = [
-  // TIMESHEET COMMANDS
+  // ENHANCED HELP COMMANDS
+  {
+    id: 'help',
+    name: 'Advanced Help',
+    triggers: ['help', 'what can you do', 'commands', 'assistance', 'voice help'],
+    intent: 'help',
+    category: 'help',
+    complexity: 'simple',
+    requiresBusinessData: false,
+    description: 'Get comprehensive help and available commands',
+    examples: ['Help me', 'What can you do?', 'Show me voice commands'],
+    response: {
+      text: "I'm your {{businessName}} voice assistant! I can help you with:\n\n⏰ Time: 'Clock me in/out', 'Generate timesheet'\n✅ Tasks: 'Show my tasks', 'Complete task 5', 'Auto assign tasks'\n📈 Reports: 'Generate daily report', 'Show productivity'\n💬 Communication: 'Send message to team', 'Report issue'\n📊 Status: 'Project status', 'Task status'\n\nTry saying any command or ask 'What are my tasks?'",
+      variables: { businessName: '{{businessName}}' }
+    },
+    action: {
+      type: 'ui',
+      payload: {
+        component: 'command_center',
+        props: { showCategories: true, highlightHelp: true }
+      }
+    }
+  },
+
+  // ENHANCED TIMESHEET COMMANDS
   {
     id: 'clock_in',
-    name: 'Clock In',
-    triggers: ['clock in', 'start work', 'begin shift', 'clock me in'],
+    name: 'Smart Clock In',
+    triggers: ['clock in', 'start work', 'begin shift', 'clock me in', 'start my day', 'punch in'],
     intent: 'clock_in',
     category: 'timesheet',
-    description: 'Start your work shift',
+    complexity: 'business',
+    requiresBusinessData: true,
+    description: 'Clock in with location and project detection',
     examples: ['Clock me in', 'Start work', 'Begin my shift'],
     response: {
-      text: "I'll clock you in now. Have a great shift!",
-      variables: { timestamp: '{{timestamp}}' }
+      text: "Clocking you in to {{businessName}} now. Detecting your location and current project...",
+      variables: { businessName: '{{businessName}}', timestamp: '{{timestamp}}' }
     },
     action: {
       type: 'api',
@@ -75,23 +109,27 @@ export const DEFAULT_COMMANDS: CommandDefinition[] = [
         bodyTemplate: {
           timestamp: '{{timestamp}}',
           action: 'clock_in',
-          source: 'voice_ai'
+          source: 'voice_ai',
+          detectLocation: true,
+          detectProject: true
         }
       }
     }
   },
-  
+
   {
     id: 'clock_out',
-    name: 'Clock Out',
-    triggers: ['clock out', 'end work', 'finish shift', 'clock me out'],
+    name: 'Smart Clock Out',
+    triggers: ['clock out', 'end work', 'finish shift', 'clock me out', 'end my day', 'punch out'],
     intent: 'clock_out',
     category: 'timesheet',
-    description: 'End your work shift',
+    complexity: 'business',
+    requiresBusinessData: true,
+    description: 'Clock out with automatic day summary',
     examples: ['Clock me out', 'End work', 'Finish my shift'],
     response: {
-      text: "I'll clock you out now. Great work today!",
-      variables: { timestamp: '{{timestamp}}' }
+      text: "Clocking you out of {{businessName}}. Generating your day summary...",
+      variables: { businessName: '{{businessName}}', timestamp: '{{timestamp}}' }
     },
     action: {
       type: 'api',
@@ -101,76 +139,85 @@ export const DEFAULT_COMMANDS: CommandDefinition[] = [
         bodyTemplate: {
           timestamp: '{{timestamp}}',
           action: 'clock_out',
-          source: 'voice_ai'
+          source: 'voice_ai',
+          generateSummary: true
         }
       }
     }
   },
 
   {
-    id: 'break_start',
-    name: 'Start Break',
-    triggers: ['start break', 'begin break', 'going on break', 'break time'],
-    intent: 'break_start',
+    id: 'generate_timesheet',
+    name: 'Generate Timesheet',
+    triggers: ['generate timesheet', 'create timesheet', 'show my timesheet', 'timesheet report'],
+    intent: 'generate_timesheet',
     category: 'timesheet',
-    description: 'Start your break period',
-    examples: ['Start my break', 'Going on break', 'Break time'],
+    complexity: 'business',
+    requiresBusinessData: true,
+    description: 'Generate comprehensive timesheet report',
+    examples: ['Generate my timesheet', 'Show timesheet for this week', 'Create timesheet report'],
     response: {
-      text: "Starting your break now. Enjoy your time off!",
-      variables: { timestamp: '{{timestamp}}' }
+      text: "Generating your comprehensive timesheet report with hours, projects, and productivity metrics...",
+      variables: {}
     },
     action: {
       type: 'api',
       payload: {
-        endpoint: '/api/timesheet/break-start',
+        endpoint: '/api/timesheet/generate',
         method: HTTPMethod.POST,
         bodyTemplate: {
-          timestamp: '{{timestamp}}',
-          action: 'break_start',
+          period: 'current_week',
+          includeProjects: true,
+          includeProductivity: true,
           source: 'voice_ai'
         }
       }
     }
   },
 
+  // ENHANCED TASK COMMANDS
   {
-    id: 'break_end',
-    name: 'End Break',
-    triggers: ['end break', 'back from break', 'resume work', 'break over'],
-    intent: 'break_end',
-    category: 'timesheet',
-    description: 'End your break period',
-    examples: ['End my break', 'Back from break', 'Resume work'],
-    response: {
-      text: "Welcome back! I'll end your break now.",
-      variables: { timestamp: '{{timestamp}}' }
-    },
-    action: {
-      type: 'api',
-      payload: {
-        endpoint: '/api/timesheet/break-end',
-        method: HTTPMethod.POST,
-        bodyTemplate: {
-          timestamp: '{{timestamp}}',
-          action: 'break_end',
-          source: 'voice_ai'
-        }
-      }
-    }
-  },
-
-  // TASK COMMANDS
-  {
-    id: 'complete_task',
-    name: 'Complete Task',
-    triggers: ['complete task', 'task done', 'finished task', 'mark complete'],
-    intent: 'complete_task',
+    id: 'get_tasks',
+    name: 'Get My Tasks',
+    triggers: ['get my tasks', 'show tasks', 'what are my tasks', 'task list', 'list my tasks', 'show my work'],
+    intent: 'get_tasks',
     category: 'tasks',
-    description: 'Mark a task as completed',
-    examples: ['Complete database cleanup task', 'Mark inventory task as done'],
+    complexity: 'business',
+    requiresBusinessData: true,
+    description: 'Get intelligent task list with priorities and deadlines',
+    examples: ['Show my tasks', 'What are my tasks today?', 'List my work'],
     response: {
-      text: "I'll mark \"{{taskName}}\" as complete.",
-      variables: { taskName: '{{taskName}}', timestamp: '{{timestamp}}' }
+      text: "Getting your current tasks with priorities, deadlines, and project assignments...",
+      variables: {}
+    },
+    action: {
+      type: 'api',
+      payload: {
+        endpoint: '/api/tasks/my-tasks',
+        method: HTTPMethod.GET,
+        queryParams: {
+          includePriority: true,
+          includeDeadlines: true,
+          includeProjects: true,
+          source: 'voice_ai'
+        }
+      }
+    }
+  },
+
+  {
+    id: 'complete_task_number',
+    name: 'Complete Task by Number',
+    triggers: ['complete task', 'finish task', 'done task', 'mark task complete', 'task done'],
+    intent: 'complete_task_number',
+    category: 'tasks',
+    complexity: 'business',
+    requiresBusinessData: true,
+    description: 'Complete a specific task by number or name',
+    examples: ['Complete task 5', 'Finish task number 3', 'Mark task 7 as done'],
+    response: {
+      text: "Completing task {{taskIdentifier}} and updating project progress...",
+      variables: { taskIdentifier: '{{taskIdentifier}}', timestamp: '{{timestamp}}' }
     },
     action: {
       type: 'api',
@@ -178,92 +225,183 @@ export const DEFAULT_COMMANDS: CommandDefinition[] = [
         endpoint: '/api/tasks/complete',
         method: HTTPMethod.PUT,
         bodyTemplate: {
-          taskName: '{{taskName}}',
+          taskIdentifier: '{{taskIdentifier}}',
           completedAt: '{{timestamp}}',
-          source: 'voice_ai'
+          source: 'voice_ai',
+          updateProgress: true
         }
       }
     },
     validation: {
-      requiredEntities: ['taskName']
+      requiredEntities: ['taskIdentifier']
     }
   },
 
   {
-    id: 'get_tasks',
-    name: 'Get My Tasks',
-    triggers: ['get my tasks', 'show tasks', 'what are my tasks', 'task list'],
-    intent: 'get_tasks',
+    id: 'auto_assign_tasks',
+    name: 'Auto Assign Tasks',
+    triggers: ['auto assign tasks', 'assign tasks automatically', 'smart assign', 'distribute tasks'],
+    intent: 'auto_assign_tasks',
     category: 'tasks',
-    description: 'Get your current task list',
-    examples: ['Show my tasks', 'What are my tasks today?'],
+    complexity: 'business',
+    requiresBusinessData: true,
+    description: 'Automatically assign tasks based on skills and workload',
+    examples: ['Auto assign new tasks', 'Smart assign tasks to team', 'Distribute tasks automatically'],
     response: {
-      text: "Let me get your current tasks.",
+      text: "Running intelligent task assignment based on team skills, workload, and availability...",
       variables: {}
     },
     action: {
       type: 'api',
       payload: {
-        endpoint: '/api/tasks/my-tasks',
-        method: HTTPMethod.GET
+        endpoint: '/api/tasks/auto-assign',
+        method: HTTPMethod.POST,
+        bodyTemplate: {
+          criteria: 'skills_workload_availability',
+          source: 'voice_ai',
+          notifyAssignees: true
+        }
       }
     }
   },
 
-  // STATUS COMMANDS
   {
-    id: 'get_status',
-    name: 'Get Status',
-    triggers: ['get status', 'my status', 'current status', 'work status'],
-    intent: 'get_status',
+    id: 'task_status',
+    name: 'Task Status',
+    triggers: ['task status', 'status of task', 'how is task', 'task progress'],
+    intent: 'task_status',
     category: 'status',
-    description: 'Get your current work status',
-    examples: ['What\'s my status?', 'Get current status'],
+    complexity: 'business',
+    requiresBusinessData: true,
+    description: 'Get detailed status of specific task',
+    examples: ['Status of task 5', 'How is the foundation task?', 'Task 3 progress'],
     response: {
-      text: "Let me check your current work status.",
+      text: "Getting detailed status for {{taskIdentifier}} including progress, assignee, and timeline...",
+      variables: { taskIdentifier: '{{taskIdentifier}}' }
+    },
+    action: {
+      type: 'api',
+      payload: {
+        endpoint: '/api/tasks/{{taskId}}/status',
+        method: HTTPMethod.GET,
+        queryParams: {
+          includeProgress: true,
+          includeTimeline: true,
+          includeAssignee: true
+        }
+      }
+    },
+    validation: {
+      requiredEntities: ['taskIdentifier']
+    }
+  },
+
+  // ADVANCED REPORTING COMMANDS
+  {
+    id: 'daily_report',
+    name: 'Generate Daily Report',
+    triggers: ['generate daily report', 'daily report', 'create daily summary', 'day report'],
+    intent: 'daily_report',
+    category: 'reports',
+    complexity: 'business',
+    requiresBusinessData: true,
+    description: 'Generate comprehensive daily activity and productivity report',
+    examples: ['Generate daily report', 'Create today\'s summary', 'Daily productivity report'],
+    response: {
+      text: "Generating comprehensive daily report with productivity metrics, completed tasks, time analysis, and team performance...",
       variables: {}
     },
     action: {
       type: 'api',
       payload: {
-        endpoint: '/api/status/current',
-        method: HTTPMethod.GET
+        endpoint: '/api/reports/daily',
+        method: HTTPMethod.POST,
+        bodyTemplate: {
+          date: '{{currentDate}}',
+          includeProductivity: true,
+          includeTasks: true,
+          includeTimeAnalysis: true,
+          includeTeamMetrics: true,
+          source: 'voice_ai'
+        }
       }
     }
   },
 
   {
-    id: 'project_status',
-    name: 'Project Status',
-    triggers: ['project status', 'project progress', 'how is project'],
-    intent: 'project_status',
-    category: 'status',
-    description: 'Get current project status',
-    examples: ['How is the downtown project?', 'Project status update'],
+    id: 'productivity_report',
+    name: 'Productivity Analysis',
+    triggers: ['productivity report', 'show productivity', 'productivity analysis', 'efficiency report'],
+    intent: 'productivity_report',
+    category: 'reports',
+    complexity: 'business',
+    requiresBusinessData: true,
+    description: 'Advanced productivity analysis with trends and insights',
+    examples: ['Show my productivity', 'Productivity analysis', 'How efficient am I?'],
     response: {
-      text: "Let me get the status for {{projectName}}.",
-      variables: { projectName: '{{projectName}}' }
+      text: "Analyzing your productivity patterns, efficiency trends, and performance insights...",
+      variables: {}
     },
     action: {
       type: 'api',
       payload: {
-        endpoint: '/api/projects/{{projectId}}/status',
-        method: HTTPMethod.GET
+        endpoint: '/api/reports/productivity',
+        method: HTTPMethod.GET,
+        queryParams: {
+          period: 'week',
+          includeTrends: true,
+          includeComparisons: true,
+          includeInsights: true
+        }
       }
     }
   },
 
-  // COMMUNICATION COMMANDS
+  // ENHANCED COMMUNICATION COMMANDS
+  {
+    id: 'send_message',
+    name: 'Send Team Message',
+    triggers: ['send message', 'message team', 'tell team', 'notify team', 'broadcast message'],
+    intent: 'send_message',
+    category: 'communication',
+    complexity: 'business',
+    requiresBusinessData: true,
+    description: 'Send message to team or specific person',
+    examples: ['Send message to team', 'Tell John about the delay', 'Notify team about meeting'],
+    response: {
+      text: "Sending message: '{{messageContent}}' to {{recipient}}...",
+      variables: { messageContent: '{{messageContent}}', recipient: '{{recipient}}' }
+    },
+    action: {
+      type: 'api',
+      payload: {
+        endpoint: '/api/communication/send-message',
+        method: HTTPMethod.POST,
+        bodyTemplate: {
+          message: '{{messageContent}}',
+          recipient: '{{recipient}}',
+          source: 'voice_ai',
+          priority: 'normal'
+        }
+      }
+    },
+    validation: {
+      requiredEntities: ['messageContent', 'recipient']
+    }
+  },
+
   {
     id: 'report_issue',
-    name: 'Report Issue',
-    triggers: ['report issue', 'problem found', 'there is a problem', 'issue alert'],
+    name: 'Smart Issue Reporting',
+    triggers: ['report issue', 'problem found', 'there is a problem', 'issue alert', 'report problem'],
     intent: 'report_issue',
     category: 'communication',
-    description: 'Report a problem or issue',
-    examples: ['Report equipment issue', 'There is a safety problem'],
+    complexity: 'business',
+    requiresBusinessData: true,
+    description: 'Report issue with automatic categorization and routing',
+    examples: ['Report safety issue', 'There is equipment problem', 'Issue with foundation'],
     response: {
-      text: "I've logged your {{issueType}} issue. Someone will follow up soon.",
+      text: "Reporting {{issueType}} issue with automatic priority assessment and team notification...",
       variables: { issueType: '{{issueType}}', description: '{{rawText}}' }
     },
     action: {
@@ -275,7 +413,68 @@ export const DEFAULT_COMMANDS: CommandDefinition[] = [
           description: '{{rawText}}',
           type: '{{issueType}}',
           reportedAt: '{{timestamp}}',
-          source: 'voice_ai'
+          source: 'voice_ai',
+          autoAssignPriority: true,
+          autoNotifyTeam: true
+        }
+      }
+    }
+  },
+
+  // STATUS AND MONITORING COMMANDS
+  {
+    id: 'get_status',
+    name: 'Smart Status Check',
+    triggers: ['get status', 'my status', 'current status', 'work status', 'show status'],
+    intent: 'get_status',
+    category: 'status',
+    complexity: 'business',
+    requiresBusinessData: true,
+    description: 'Get comprehensive work status with insights',
+    examples: ['What\'s my status?', 'Show current status', 'Work status update'],
+    response: {
+      text: "Getting your comprehensive status including active tasks, time tracking, project progress, and team updates...",
+      variables: {}
+    },
+    action: {
+      type: 'api',
+      payload: {
+        endpoint: '/api/status/comprehensive',
+        method: HTTPMethod.GET,
+        queryParams: {
+          includeTasks: true,
+          includeTimeTracking: true,
+          includeProjects: true,
+          includeTeamUpdates: true
+        }
+      }
+    }
+  },
+
+  {
+    id: 'project_status',
+    name: 'Project Status',
+    triggers: ['project status', 'project progress', 'how is project', 'project update'],
+    intent: 'project_status',
+    category: 'status',
+    complexity: 'business',
+    requiresBusinessData: true,
+    description: 'Get detailed project status with timeline and progress',
+    examples: ['How is the downtown project?', 'Project status update', 'Show project progress'],
+    response: {
+      text: "Getting status for {{projectName}} with progress, timeline, team assignments, and upcoming milestones...",
+      variables: { projectName: '{{projectName}}' }
+    },
+    action: {
+      type: 'api',
+      payload: {
+        endpoint: '/api/projects/{{projectId}}/status',
+        method: HTTPMethod.GET,
+        queryParams: {
+          includeProgress: true,
+          includeTimeline: true,
+          includeTeam: true,
+          includeMilestones: true
         }
       }
     }
@@ -284,57 +483,46 @@ export const DEFAULT_COMMANDS: CommandDefinition[] = [
   {
     id: 'team_status',
     name: 'Team Status',
-    triggers: ['team status', 'how is my team', 'team update'],
+    triggers: ['team status', 'how is my team', 'team update', 'team progress'],
     intent: 'team_status',
-    category: 'communication',
-    description: 'Get your team\'s current status',
-    examples: ['How is my team doing?', 'Team status update'],
+    category: 'status',
+    complexity: 'business',
+    requiresBusinessData: true,
+    description: 'Get team status with availability and performance',
+    examples: ['How is my team doing?', 'Team status update', 'Show team progress'],
     response: {
-      text: "Let me get your team's current status.",
+      text: "Getting your team's status including availability, current tasks, performance metrics, and location updates...",
       variables: {}
     },
     action: {
       type: 'api',
       payload: {
         endpoint: '/api/teams/status',
-        method: HTTPMethod.GET
+        method: HTTPMethod.GET,
+        queryParams: {
+          includeAvailability: true,
+          includeTasks: true,
+          includePerformance: true,
+          includeLocations: true
+        }
       }
     }
   },
 
-  // HELP COMMANDS
-  {
-    id: 'help',
-    name: 'Help',
-    triggers: ['help', 'what can you do', 'commands', 'assistance'],
-    intent: 'help',
-    category: 'help',
-    description: 'Get help and see available commands',
-    examples: ['Help me', 'What can you do?', 'Show commands'],
-    response: {
-      text: "I can help you with time tracking, tasks, status checks, and reporting issues. Say 'show commands' to see everything I can do!",
-      variables: {}
-    },
-    action: {
-      type: 'ui',
-      payload: {
-        component: 'command_center',
-        props: { showCategories: true, highlightHelp: true }
-      }
-    }
-  },
-
+  // ADVANCED HELP COMMANDS
   {
     id: 'commands_list',
-    name: 'Show Commands',
-    triggers: ['show commands', 'list commands', 'what commands', 'available commands'],
+    name: 'Show All Commands',
+    triggers: ['show commands', 'list commands', 'what commands', 'available commands', 'voice commands'],
     intent: 'commands_list',
     category: 'help',
-    description: 'Show all available voice commands',
-    examples: ['Show all commands', 'What commands are available?'],
+    complexity: 'simple',
+    requiresBusinessData: false,
+    description: 'Show all available voice commands by category',
+    examples: ['Show all commands', 'What commands are available?', 'List voice commands'],
     response: {
-      text: "Here are all the commands I understand. You can also use the command center to explore them.",
-      variables: {}
+      text: "Here are all available {{businessName}} voice commands organized by category. You can also use the command center for interactive exploration.",
+      variables: { businessName: '{{businessName}}' }
     },
     action: {
       type: 'ui',
@@ -343,11 +531,27 @@ export const DEFAULT_COMMANDS: CommandDefinition[] = [
         props: { showCategories: true, expandAll: true }
       }
     }
+  },
+
+  {
+    id: 'voice_tips',
+    name: 'Voice Tips',
+    triggers: ['voice tips', 'how to use voice', 'voice help', 'voice guide'],
+    intent: 'voice_tips',
+    category: 'help',
+    complexity: 'simple',
+    requiresBusinessData: false,
+    description: 'Get tips for effective voice usage',
+    examples: ['Voice tips', 'How to use voice commands?', 'Voice usage guide'],
+    response: {
+      text: "Voice Tips for {{businessName}}:\n\n🎯 Be specific: 'Complete task 5' instead of 'complete task'\n⏱️ Use natural language: 'Clock me in' or 'Start my day'\n📋 Try shortcuts: 'Status', 'Tasks', 'Report'\n🔊 Speak clearly and wait for confirmation\n💡 Say 'Help' anytime for available commands",
+      variables: { businessName: '{{businessName}}' }
+    }
   }
 ];
 
 // =====================================
-// COMMAND REGISTRY
+// ENHANCED COMMAND REGISTRY
 // =====================================
 
 export const DEFAULT_COMMAND_REGISTRY = {
@@ -356,15 +560,25 @@ export const DEFAULT_COMMAND_REGISTRY = {
   aliases: {
     'start': 'clock_in',
     'stop': 'clock_out',
-    'done': 'complete_task',
-    'finished': 'complete_task',
+    'punch in': 'clock_in',
+    'punch out': 'clock_out',
+    'done': 'complete_task_number',
+    'finished': 'complete_task_number',
+    'complete': 'complete_task_number',
     'status': 'get_status',
-    'tasks': 'get_tasks'
+    'tasks': 'get_tasks',
+    'report': 'daily_report',
+    'timesheet': 'generate_timesheet',
+    'assign': 'auto_assign_tasks',
+    'message': 'send_message',
+    'issue': 'report_issue',
+    'team': 'team_status',
+    'project': 'project_status'
   }
 };
 
 // =====================================
-// UTILITY FUNCTIONS
+// ENHANCED UTILITY FUNCTIONS
 // =====================================
 
 export function getCommandsByCategory(categoryId: string): CommandDefinition[] {
@@ -387,4 +601,16 @@ export function findCommandByTrigger(trigger: string): CommandDefinition | undef
   return DEFAULT_COMMANDS.find(cmd => 
     cmd.triggers.some(t => lowerTrigger.includes(t.toLowerCase()))
   );
+}
+
+export function getBusinessCommands(): CommandDefinition[] {
+  return DEFAULT_COMMANDS.filter(cmd => cmd.requiresBusinessData === true);
+}
+
+export function getSimpleCommands(): CommandDefinition[] {
+  return DEFAULT_COMMANDS.filter(cmd => cmd.requiresBusinessData === false);
+}
+
+export function getCommandsByComplexity(complexity: 'simple' | 'business'): CommandDefinition[] {
+  return DEFAULT_COMMANDS.filter(cmd => cmd.complexity === complexity);
 }

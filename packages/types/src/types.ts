@@ -46,16 +46,90 @@ export interface KeywordsConfig {
 export type AIProviderConfig = OpenAIConfig | AnthropicConfig | GoogleConfig | KeywordsConfig;
 
 // =====================================
+// BUSINESS CONTEXT TYPES
+// =====================================
+
+export interface BusinessContext {
+  name: string; // "Staffluent", "TaskMaster", "ProjectPro", etc.
+  domain: string; // "construction", "retail", "healthcare"
+  capabilities: string[]; // ["time tracking", "task management", "projects"]
+  website?: string;
+  supportEmail?: string;
+  brandColor?: string;
+  customVariables?: Record<string, string>; // Custom {{variable}} replacements
+}
+
+export interface BusinessCommandConfig {
+  intent: string;
+  triggers: string[];
+  response: string; // Template with variables
+  requiresApi: boolean;
+  apiEndpoint?: string;
+  method?: HTTPMethod;
+  category: string;
+  priority?: number;
+  entityRequirements?: string[]; // Required entities like 'taskIdentifier'
+  examples?: string[];
+}
+
+// =====================================
+// ENTITY EXTRACTION TYPES
+// =====================================
+
+export interface ExtractedEntity {
+  type: EntityType;
+  value: string;
+  confidence: number;
+  sourceText: string;
+  position?: {
+    start: number;
+    end: number;
+  };
+}
+
+export enum EntityType {
+  TASK_IDENTIFIER = 'taskIdentifier',
+  TASK_NUMBER = 'taskNumber',
+  PROJECT_NAME = 'projectName',
+  RECIPIENT = 'recipient',
+  MESSAGE_CONTENT = 'messageContent',
+  ISSUE_TYPE = 'issueType',
+  PRIORITY_LEVEL = 'priorityLevel',
+  DATE_TIME = 'dateTime',
+  USER_NAME = 'userName',
+  TEAM_NAME = 'teamName',
+  LOCATION = 'location',
+  AMOUNT = 'amount',
+  PERCENTAGE = 'percentage'
+}
+
+export interface EntityExtractionResult {
+  entities: Record<string, ExtractedEntity>;
+  confidence: number;
+  missingRequired?: string[];
+  extractedText: string;
+}
+
+// =====================================
 // COMMAND SYSTEM TYPES
 // =====================================
 
 export interface VoiceCommand {
   intent: string;
-  entities: Record<string, any>;
+  entities: Record<string, ExtractedEntity>;
   confidence: number;
   rawText: string;
   timestamp: Date;
   provider?: AIProvider;
+  complexity?: CommandComplexity;
+  requiresBusinessData?: boolean;
+  businessContext?: BusinessContext;
+}
+
+export enum CommandComplexity {
+  SIMPLE = 'simple',         // Voice package can handle alone
+  BUSINESS = 'business',     // Needs business API integration
+  HYBRID = 'hybrid'          // Partial handling + business API
 }
 
 export interface CommandDefinition {
@@ -76,6 +150,14 @@ export interface CommandDefinition {
     patterns?: RegExp[];
   };
   metadata?: Record<string, any>;
+  
+  // 🆕 NEW: Command Classification
+  complexity: CommandComplexity;
+  requiresBusinessData: boolean;
+  entityRequirements?: EntityType[];
+  businessKeywords?: string[]; // Keywords that indicate business context
+  fallbackReason?: string; // Why this command needs fallback
+  confidenceThreshold?: number; // Minimum confidence to handle
 }
 
 export interface CommandAction {
@@ -105,6 +187,7 @@ export interface CommandRegistry {
   commands: CommandDefinition[];
   categories: CommandCategory[];
   aliases: Record<string, string>;
+  businessCommands?: BusinessCommandConfig[]; // 🆕 NEW
 }
 
 export interface CommandCategory {
@@ -114,6 +197,7 @@ export interface CommandCategory {
   icon?: string;
   color?: string;
   commands: string[]; // Command IDs
+  businessRelevant?: boolean; // 🆕 NEW: Requires business context
 }
 
 // =====================================
@@ -167,12 +251,34 @@ export interface VoiceAIConfig {
   speechToText: SpeechToTextConfig;
   textToSpeech: TextToSpeechConfig;
   
+  // 🆕 NEW: Business Context Configuration
+  businessContext?: BusinessContext;
+  
   // Command system
   commands?: {
     registry?: CommandRegistry;
     customCommands?: CommandDefinition[];
+    businessCommands?: BusinessCommandConfig[]; // 🆕 NEW
     enabledCategories?: string[];
     disabledCommands?: string[];
+  };
+  
+  // 🆕 NEW: Entity Extraction Configuration
+  entityExtraction?: {
+    enabled: boolean;
+    confidenceThreshold: number;
+    customPatterns?: Record<EntityType, RegExp>;
+    enableContextualExtraction?: boolean;
+  };
+  
+  // 🆕 NEW: Fallback Configuration
+  fallback?: {
+    enableSmartFallback: boolean;
+    confidenceThreshold: number;
+    businessApiBaseUrl?: string;
+    businessApiKey?: string;
+    fallbackTimeout?: number;
+    retryAttempts?: number;
   };
   
   // Behavior settings
@@ -208,7 +314,7 @@ export interface VoiceAIConfig {
     debugMode?: boolean;
   };
    
-  // NEW: Interface mode configuration
+  // Interface mode configuration
   interfaceMode?: VoiceInterfaceMode;
   visibility?: VisibilityConfig;
 }
@@ -229,6 +335,16 @@ export interface VoiceResponse {
     processingTime?: number;
     cached?: boolean;
   };
+  
+  // 🆕 NEW: Fallback Information
+  canHandle: boolean; // Can voice package handle this completely?
+  shouldFallback: boolean; // Should fallback to business API?
+  fallbackReason?: string; // Why fallback is needed
+  intent?: string; // Detected intent for business API
+  entities?: Record<string, ExtractedEntity>; // Extracted entities
+  commandType?: CommandComplexity; // Command complexity classification
+  businessContext?: BusinessContext; // Business context used
+  requiresApproval?: boolean; // Needs user confirmation before execution
 }
 
 export interface VoiceAIState {
@@ -247,6 +363,11 @@ export interface VoiceAIState {
   commandHistory?: VoiceCommand[];
   suggestedCommands?: CommandDefinition[];
   
+  // 🆕 NEW: Business Context State
+  businessContext?: BusinessContext;
+  entityExtractionEnabled?: boolean;
+  fallbackMode?: boolean;
+  
   // UI state
   isCommandCenterOpen?: boolean;
   selectedCategory?: string;
@@ -263,6 +384,12 @@ export interface VoiceAIEvents {
   onStateChange?: (state: VoiceAIState) => void;
   onProviderSwitch?: (provider: AIProvider) => void;
   onCommandExecuted?: (command: CommandDefinition, result: any) => void;
+  
+  // 🆕 NEW: Business Context Events
+  onBusinessContextChanged?: (context: BusinessContext) => void;
+  onEntityExtracted?: (entities: Record<string, ExtractedEntity>) => void;
+  onFallbackTriggered?: (reason: string, intent: string) => void;
+  onFallbackCompleted?: (success: boolean, result: any) => void;
 }
 
 export interface VoiceAIError {
@@ -272,6 +399,7 @@ export interface VoiceAIError {
   provider?: AIProvider;
   recoverable?: boolean;
   suggestions?: string[];
+  businessContext?: boolean; // 🆕 NEW: Business context related error
 }
 
 // =====================================
@@ -314,6 +442,11 @@ export interface VoiceButtonProps {
   onCommand?: (command: VoiceCommand) => void;
   onResponse?: (response: VoiceResponse) => void;
   onError?: (error: VoiceAIError) => void;
+  
+  // 🆕 NEW: Fallback Integration
+  onFallbackNeeded?: (intent: string, entities: Record<string, ExtractedEntity>) => Promise<any>;
+  enableFallbackMode?: boolean;
+  businessApiIntegration?: boolean;
 }
 
 export interface VoiceCommandCenterProps {
@@ -327,6 +460,10 @@ export interface VoiceCommandCenterProps {
   onCommand?: (command: VoiceCommand) => void;
   onResponse?: (response: VoiceResponse) => void;
   onError?: (error: VoiceAIError) => void;
+  
+  // 🆕 NEW: Business Integration
+  businessContext?: BusinessContext;
+  showBusinessCommands?: boolean;
 }
 
 export interface VoiceProviderProps {
@@ -381,6 +518,12 @@ export interface VisibilityConfig {
   showHistoryPanel?: boolean;
   showStatusIndicator?: boolean;
   
+  // 🆕 NEW: Business Features
+  showBusinessCommands?: boolean;
+  showEntityExtraction?: boolean;
+  showFallbackOptions?: boolean;
+  showBusinessContext?: boolean;
+  
   // Labeling and terminology
   useGenericLabels?: boolean;
   customLabels?: CustomLabels;
@@ -393,6 +536,7 @@ export interface CustomLabels {
     stopText?: string;
     processingText?: string;
     errorText?: string;
+    fallbackText?: string; // 🆕 NEW
   };
   status?: {
     online?: string;
@@ -400,6 +544,7 @@ export interface CustomLabels {
     listening?: string;
     processing?: string;
     error?: string;
+    fallback?: string; // 🆕 NEW
   };
   providers?: {
     generic?: string; // e.g., "Voice AI" instead of "OpenAI"
@@ -409,6 +554,15 @@ export interface CustomLabels {
     generic?: string;
     connection?: string;
     permission?: string;
+    businessContext?: string; // 🆕 NEW
+    entityExtraction?: string; // 🆕 NEW
+  };
+  
+  // 🆕 NEW: Business Labels
+  business?: {
+    commands?: string; // "Business Commands"
+    context?: string; // "Business Context"
+    fallback?: string; // "Fallback to Business System"
   };
 }
 
@@ -438,6 +592,10 @@ export const DEFAULT_MODE_PRESETS: ModePresets = {
     showSettingsPanel: true,
     showHistoryPanel: true,
     showStatusIndicator: true,
+    showBusinessCommands: true,
+    showEntityExtraction: true,
+    showFallbackOptions: true,
+    showBusinessContext: true,
     useGenericLabels: false,
   },
   
@@ -445,7 +603,7 @@ export const DEFAULT_MODE_PRESETS: ModePresets = {
     // Balanced view for projects to configure
     showProviders: true,
     showProviderStatus: true,
-    showProviderErrors: false, // Hide detailed errors
+    showProviderErrors: false,
     showDebugInfo: false,
     showConfidenceScores: true,
     showProcessingTimes: false,
@@ -458,6 +616,10 @@ export const DEFAULT_MODE_PRESETS: ModePresets = {
     showSettingsPanel: true,
     showHistoryPanel: true,
     showStatusIndicator: true,
+    showBusinessCommands: true,
+    showEntityExtraction: false,
+    showFallbackOptions: true,
+    showBusinessContext: false,
     useGenericLabels: false,
   },
   
@@ -471,27 +633,33 @@ export const DEFAULT_MODE_PRESETS: ModePresets = {
     showProcessingTimes: false,
     showTechnicalErrors: false,
     showAdvancedSettings: false,
-    showCommandHistory: true, // Keep command history as it's useful
+    showCommandHistory: true,
     showAnalytics: false,
     showExportOptions: false,
-    showMiniCenter: true, // Keep but simplified
+    showMiniCenter: true,
     showSettingsPanel: false,
     showHistoryPanel: false,
-    showStatusIndicator: true, // Keep status but simplified
+    showStatusIndicator: true,
+    showBusinessCommands: false, // Hide for simplicity
+    showEntityExtraction: false,
+    showFallbackOptions: false,
+    showBusinessContext: false,
     useGenericLabels: true,
     customLabels: {
       voiceButton: {
         startText: 'Start Voice',
         stopText: 'Stop Voice',
         processingText: 'Processing...',
-        errorText: 'Voice Unavailable'
+        errorText: 'Voice Unavailable',
+        fallbackText: 'Connecting...'
       },
       status: {
         online: 'Voice Ready',
         offline: 'Voice Unavailable',
         listening: 'Listening...',
         processing: 'Processing...',
-        error: 'Voice Error'
+        error: 'Voice Error',
+        fallback: 'Processing Request...'
       },
       providers: {
         generic: 'Voice Assistant',
@@ -500,7 +668,14 @@ export const DEFAULT_MODE_PRESETS: ModePresets = {
       errors: {
         generic: 'Voice assistant is temporarily unavailable',
         connection: 'Please check your connection',
-        permission: 'Microphone permission required'
+        permission: 'Microphone permission required',
+        businessContext: 'Business context unavailable',
+        entityExtraction: 'Could not understand the request'
+      },
+      business: {
+        commands: 'Available Commands',
+        context: 'Assistant Info',
+        fallback: 'Processing...'
       }
     }
   }
@@ -522,6 +697,11 @@ export interface VoiceModeProps {
    * Custom labels override
    */
   customLabels?: Partial<CustomLabels>;
+  
+  /**
+   * Business context override
+   */
+  businessContext?: BusinessContext;
 }
 
 // Utility function to resolve final visibility config
@@ -558,14 +738,16 @@ export function getEffectiveLabels(
           startText: 'Start Listening',
           stopText: 'Stop Listening',
           processingText: 'Processing voice...',
-          errorText: 'Voice error'
+          errorText: 'Voice error',
+          fallbackText: 'Connecting to system...'
         },
         status: {
           online: 'Online',
           offline: 'Offline',
           listening: 'Listening',
           processing: 'Processing',
-          error: 'Error'
+          error: 'Error',
+          fallback: 'Fallback Mode'
         },
         providers: {
           generic: 'AI Provider',
@@ -574,7 +756,14 @@ export function getEffectiveLabels(
         errors: {
           generic: 'An error occurred',
           connection: 'Connection failed',
-          permission: 'Permission denied'
+          permission: 'Permission denied',
+          businessContext: 'Business context error',
+          entityExtraction: 'Entity extraction failed'
+        },
+        business: {
+          commands: 'Business Commands',
+          context: 'Business Context',
+          fallback: 'Business System'
         }
       };
 
@@ -583,7 +772,7 @@ export function getEffectiveLabels(
     voiceButton: { ...baseLabels.voiceButton, ...customLabels?.voiceButton },
     status: { ...baseLabels.status, ...customLabels?.status },
     providers: { ...baseLabels.providers, ...customLabels?.providers },
-    errors: { ...baseLabels.errors, ...customLabels?.errors }
+    errors: { ...baseLabels.errors, ...customLabels?.errors },
+    business: { ...baseLabels.business, ...customLabels?.business }
   };
 }
-

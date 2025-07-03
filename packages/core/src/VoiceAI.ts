@@ -17,6 +17,11 @@ import {
   OpenAIConfig,
   AnthropicConfig,
   GoogleConfig,
+  BusinessContext,
+  ExtractedEntity,
+  EntityType,
+  EntityExtractionResult,
+  CommandComplexity
 } from '../../types/src/types';
 
 import { DEFAULT_COMMAND_REGISTRY, findCommandByTrigger, getCommandByIntent } from '../../types/src/commands';
@@ -28,16 +33,21 @@ export class VoiceAI {
   private speechSynthesis!: SpeechSynthesis;
   private eventListeners: Partial<VoiceAIEvents> = {};
   private commandRegistry: CommandRegistry;
-  // Remove unused providerInstances to fix TS6133
-  // private providerInstances: Map<AIProvider, any> = new Map();
+  
+  // 🆕 NEW: Business Context Support
+  private businessContext: BusinessContext;
 
   constructor(config: VoiceAIConfig, events?: Partial<VoiceAIEvents>) {
     this.validateConfig(config);
     this.config = this.mergeWithDefaults(config);
     this.eventListeners = events || {};
+    
+    // 🆕 NEW: Initialize Business Context
+    this.businessContext = this.initializeBusinessContext();
+    
     this.commandRegistry = this.initializeCommandRegistry();
     
-    // FIX: Initialize providerStatus with all required AIProvider keys
+    // Initialize providerStatus with all required AIProvider keys
     this.state = {
       isListening: false,
       isProcessing: false,
@@ -50,10 +60,37 @@ export class VoiceAI {
         [AIProvider.GOOGLE]: 'error',
         [AIProvider.KEYWORDS]: 'available'
       } as Record<AIProvider, 'available' | 'error' | 'timeout'>,
-      isCommandCenterOpen: false
+      isCommandCenterOpen: false,
+      // 🆕 NEW: Business Context State
+      businessContext: this.businessContext,
+      entityExtractionEnabled: this.config.entityExtraction?.enabled ?? true,
+      fallbackMode: false
     };
     
     this.initialize();
+  }
+
+  // 🆕 NEW: Initialize Business Context
+  private initializeBusinessContext(): BusinessContext {
+    if (this.config.businessContext) {
+      return {
+        name: this.config.businessContext.name || 'your assistant',
+        domain: this.config.businessContext.domain || 'general',
+        capabilities: this.config.businessContext.capabilities || ['basic commands'],
+        website: this.config.businessContext.website,
+        supportEmail: this.config.businessContext.supportEmail,
+        brandColor: this.config.businessContext.brandColor,
+        customVariables: this.config.businessContext.customVariables || {}
+      };
+    }
+
+    // Default generic context
+    return {
+      name: 'your assistant',
+      domain: 'general',
+      capabilities: ['basic commands'],
+      customVariables: {}
+    };
   }
 
   private validateConfig(config: VoiceAIConfig): void {
@@ -70,6 +107,11 @@ export class VoiceAI {
     
     if (config.aiProviders.fallbacks) {
       config.aiProviders.fallbacks.forEach(provider => this.validateAIProviderConfig(provider));
+    }
+
+    // 🆕 NEW: Validate Business Context
+    if (config.businessContext && !config.businessContext.name) {
+      console.warn('⚠️ Business context provided but no business name specified');
     }
   }
 
@@ -113,7 +155,6 @@ export class VoiceAI {
         timeoutMs: config.aiProviders.timeoutMs || 5000
       },
       
-      // FIX: Put provider after spread to avoid overwrite conflict
       speechToText: {
         language: 'en-US',
         continuous: false,
@@ -135,7 +176,26 @@ export class VoiceAI {
         customCommands: [],
         enabledCategories: [],
         disabledCommands: [],
+        businessCommands: [],
         ...config.commands
+      },
+      
+      // 🆕 NEW: Entity Extraction Defaults
+      entityExtraction: {
+        enabled: true,
+        confidenceThreshold: 0.7,
+        enableContextualExtraction: true,
+        customPatterns: {},
+        ...config.entityExtraction
+      },
+
+      // 🆕 NEW: Fallback Configuration Defaults
+      fallback: {
+        enableSmartFallback: true,
+        confidenceThreshold: 0.8,
+        fallbackTimeout: 5000,
+        retryAttempts: 1,
+        ...config.fallback
       },
       
       wakeWord: config.wakeWord,
@@ -163,7 +223,10 @@ export class VoiceAI {
         enableOfflineMode: false,
         debugMode: false,
         ...config.advanced
-      }
+      },
+
+      // 🆕 NEW: Pass through business context
+      businessContext: config.businessContext
     };
   }
 
@@ -173,6 +236,32 @@ export class VoiceAI {
     // Add custom commands if provided
     if (this.config.commands?.customCommands) {
       registry.commands = [...registry.commands, ...this.config.commands.customCommands];
+    }
+
+    // 🆕 NEW: Add business commands if provided
+    if (this.config.commands?.businessCommands) {
+      const businessCommands: CommandDefinition[] = this.config.commands.businessCommands.map(cmd => ({
+        id: `business_${cmd.intent}`,
+        name: cmd.intent,
+        triggers: cmd.triggers,
+        intent: cmd.intent,
+        category: cmd.category,
+        examples: cmd.examples,
+        complexity: CommandComplexity.BUSINESS,
+        requiresBusinessData: cmd.requiresApi,
+        response: {
+          text: cmd.response
+        },
+        action: cmd.requiresApi ? {
+          type: 'api',
+          payload: {
+            endpoint: cmd.apiEndpoint,
+            method: cmd.method || HTTPMethod.POST
+          }
+        } : undefined
+      }));
+      
+      registry.commands = [...registry.commands, ...businessCommands];
     }
     
     // Filter commands based on enabled categories and disabled commands
@@ -213,7 +302,6 @@ export class VoiceAI {
   }
 
   private async initializeAIProviders(): Promise<void> {
-    // FIX: Initialize with proper typing
     const providerStatus = {
       [AIProvider.OPENAI]: 'error',
       [AIProvider.ANTHROPIC]: 'error',
@@ -254,7 +342,6 @@ export class VoiceAI {
     }
     
     // Simple test to validate provider configuration
-    // We'll implement actual provider testing in the provider-specific methods
     return Promise.resolve();
   }
 
@@ -301,6 +388,174 @@ export class VoiceAI {
       
       this.speechSynthesis = window.speechSynthesis;
     }
+  }
+
+  // =====================================
+  // 🆕 NEW: BUSINESS CONTEXT METHODS
+  // =====================================
+
+  /**
+   * Replace business variables in text with actual business context
+   */
+  private replaceBusinessVariables(text: string): string {
+    const variables = {
+      businessName: this.businessContext.name,
+      capabilities: this.businessContext.capabilities.join(', '),
+      domain: this.businessContext.domain,
+      website: this.businessContext.website || '',
+      supportEmail: this.businessContext.supportEmail || '',
+      ...this.businessContext.customVariables
+    };
+
+    return text.replace(/\{\{(\w+)\}\}/g, (match, key) => {
+      return variables[key as keyof typeof variables] || match;
+    });
+  }
+
+  /**
+   * Classify command complexity and determine if voice package can handle it
+   */
+  private classifyCommand(command: VoiceCommand): {
+    complexity: CommandComplexity;
+    canHandle: boolean;
+    shouldFallback: boolean;
+    fallbackReason?: string;
+  } {
+    const commandDef = getCommandByIntent(command.intent);
+    
+    if (commandDef) {
+      return {
+        complexity: commandDef.complexity,
+        canHandle: !commandDef.requiresBusinessData,
+        shouldFallback: commandDef.requiresBusinessData,
+        fallbackReason: commandDef.fallbackReason || 
+          (commandDef.requiresBusinessData ? 'Requires business system integration' : undefined)
+      };
+    }
+
+    // Unknown commands need classification
+    const lowerText = command.rawText.toLowerCase();
+    
+    // Simple commands voice package can handle
+    const simpleKeywords = ['help', 'hello', 'hi', 'commands', 'what can you do'];
+    if (simpleKeywords.some(keyword => lowerText.includes(keyword))) {
+      return {
+        complexity: CommandComplexity.SIMPLE,
+        canHandle: true,
+        shouldFallback: false
+      };
+    }
+
+    // Business keywords that indicate fallback needed
+    const businessKeywords = [
+      'clock', 'task', 'project', 'assign', 'complete', 'report', 'status',
+      'timesheet', 'team', 'client', 'issue', 'schedule', 'overtime'
+    ];
+    
+    if (businessKeywords.some(keyword => lowerText.includes(keyword))) {
+      return {
+        complexity: CommandComplexity.BUSINESS,
+        canHandle: false,
+        shouldFallback: true,
+        fallbackReason: 'Business operation requires system integration'
+      };
+    }
+
+    // Default to simple for unknown commands
+    return {
+      complexity: CommandComplexity.SIMPLE,
+      canHandle: false,
+      shouldFallback: true,
+      fallbackReason: 'Unknown command'
+    };
+  }
+
+  /**
+   * Determine if voice package can handle a command
+   */
+  private canHandleCommand(command: VoiceCommand): boolean {
+    const classification = this.classifyCommand(command);
+    
+    // Check confidence threshold for fallback
+    if (this.config.fallback?.enableSmartFallback) {
+      const threshold = this.config.fallback.confidenceThreshold || 0.8;
+      if (command.confidence < threshold) {
+        return false;
+      }
+    }
+
+    return classification.canHandle;
+  }
+
+  /**
+   * Enhanced entity extraction with business context
+   */
+  private extractEntities(text: string): EntityExtractionResult {
+    const entities: Record<string, ExtractedEntity> = {};
+    let confidence = 0.7;
+
+    // Task identifier extraction (e.g., "task 5", "task number 3")
+    const taskMatch = text.match(/task\s+(?:number\s+)?(\d+)/i);
+    if (taskMatch) {
+      entities[EntityType.TASK_IDENTIFIER] = {
+        type: EntityType.TASK_IDENTIFIER,
+        value: taskMatch[1],
+        confidence: 0.9,
+        sourceText: taskMatch[0],
+        position: { start: taskMatch.index!, end: taskMatch.index! + taskMatch[0].length }
+      };
+    }
+
+    // Recipient extraction (e.g., "to John", "for Mary")
+    const recipientMatch = text.match(/(?:to|for)\s+([a-zA-Z\s]+?)(?:\s|$)/i);
+    if (recipientMatch) {
+      entities[EntityType.RECIPIENT] = {
+        type: EntityType.RECIPIENT,
+        value: recipientMatch[1].trim(),
+        confidence: 0.8,
+        sourceText: recipientMatch[0],
+        position: { start: recipientMatch.index!, end: recipientMatch.index! + recipientMatch[0].length }
+      };
+    }
+
+    // Message content extraction (e.g., "send message about delay")
+    const messageMatch = text.match(/(?:message|tell|notify).*?(?:about|regarding)\s+(.+)/i);
+    if (messageMatch) {
+      entities[EntityType.MESSAGE_CONTENT] = {
+        type: EntityType.MESSAGE_CONTENT,
+        value: messageMatch[1].trim(),
+        confidence: 0.8,
+        sourceText: messageMatch[0]
+      };
+    }
+
+    // Project name extraction
+    const projectMatch = text.match(/project\s+(.+?)(?:\s|$)/i);
+    if (projectMatch) {
+      entities[EntityType.PROJECT_NAME] = {
+        type: EntityType.PROJECT_NAME,
+        value: projectMatch[1].trim(),
+        confidence: 0.7,
+        sourceText: projectMatch[0]
+      };
+    }
+
+    // Priority level extraction
+    const priorityMatch = text.match(/\b(urgent|high|medium|low|critical)\s*priority\b/i);
+    if (priorityMatch) {
+      entities[EntityType.PRIORITY_LEVEL] = {
+        type: EntityType.PRIORITY_LEVEL,
+        value: priorityMatch[1].toLowerCase(),
+        confidence: 0.8,
+        sourceText: priorityMatch[0]
+      };
+    }
+
+    return {
+      entities,
+      confidence,
+      extractedText: text
+    };
   }
 
   // =====================================
@@ -372,6 +627,25 @@ export class VoiceAI {
     }
   }
 
+  // 🆕 NEW: Speech-only method for fallback responses
+  async speakText(text: string): Promise<void> {
+    const processedText = this.replaceBusinessVariables(text);
+    return this.speak(processedText);
+  }
+
+  // 🆕 NEW: Check if command can be handled
+  canHandle(text: string): Promise<boolean> {
+    return new Promise(async (resolve) => {
+      try {
+        const command = await this.parseCommand(text);
+        const canHandle = this.canHandleCommand(command);
+        resolve(canHandle);
+      } catch {
+        resolve(false);
+      }
+    });
+  }
+
   // =====================================
   // COMMAND PROCESSING
   // =====================================
@@ -383,6 +657,15 @@ export class VoiceAI {
       this.updateState({ isProcessing: true });
 
       const command = await this.parseCommand(transcript);
+      
+      // 🆕 NEW: Enhanced entity extraction
+      if (this.config.entityExtraction?.enabled) {
+        const extractionResult = this.extractEntities(transcript);
+        command.entities = { ...command.entities, ...extractionResult.entities };
+      }
+
+      // 🆕 NEW: Add business context to command
+      command.businessContext = this.businessContext;
       
       // Add to command history
       const newHistory = [command, ...(this.state.commandHistory || [])].slice(0, this.config.advanced?.maxHistoryItems || 50);
@@ -401,20 +684,29 @@ export class VoiceAI {
         cached: false
       };
       
-      if (response.actions) {
+      if (response.actions && response.canHandle) {
         await this.executeActions(response.actions);
       }
       
-      if (this.config.responseMode !== ResponseMode.TEXT) {
+      if (this.config.responseMode !== ResponseMode.TEXT && response.canHandle) {
         await this.speak(response.text);
       }
       
       this.eventListeners.onResponse?.(response);
       
+      // 🆕 NEW: Trigger fallback event if needed
+      if (response.shouldFallback) {
+        this.eventListeners.onFallbackTriggered?.(
+          response.fallbackReason || 'Command requires business system',
+          response.intent || command.intent
+        );
+      }
+      
       this.updateState({ 
         isProcessing: false,
         currentCommand: command,
-        lastResponse: response
+        lastResponse: response,
+        fallbackMode: response.shouldFallback
       });
       
       return response;
@@ -424,6 +716,9 @@ export class VoiceAI {
       const errorResponse: VoiceResponse = {
         text: "I'm sorry, I didn't understand that. Could you try again?",
         success: false,
+        canHandle: false,
+        shouldFallback: true,
+        fallbackReason: 'Processing error',
         data: { error: error instanceof Error ? error.message : 'Unknown error' },
         suggestions: this.getSuggestedCommands()
       };
@@ -450,6 +745,10 @@ export class VoiceAI {
       try {
         const command = await this.parseCommandWithProvider(transcript, provider);
         if (command.confidence >= (this.config.confidenceThreshold || 0.7)) {
+          // 🆕 NEW: Add command classification
+          const classification = this.classifyCommand(command);
+          command.complexity = classification.complexity;
+          command.requiresBusinessData = !classification.canHandle;
           return command;
         }
       } catch (error) {
@@ -469,7 +768,6 @@ export class VoiceAI {
   }
 
   private async parseCommandWithProvider(transcript: string, provider: AIProviderConfig): Promise<VoiceCommand> {
-    // FIX: Add type guards to ensure proper typing
     switch (provider.provider) {
       case AIProvider.OPENAI:
         return this.parseCommandWithOpenAI(transcript, provider as OpenAIConfig);
@@ -480,7 +778,6 @@ export class VoiceAI {
       case AIProvider.KEYWORDS:
         return this.parseCommandWithKeywords(transcript);
       default:
-        // This should never happen with proper typing, but provides safety
         const exhaustiveCheck: never = provider;
         throw new Error(`Unsupported provider: ${(exhaustiveCheck as any).provider}`);
     }
@@ -489,27 +786,30 @@ export class VoiceAI {
   private async parseCommandWithOpenAI(transcript: string, config: OpenAIConfig): Promise<VoiceCommand> {
     const availableIntents = this.commandRegistry.commands.map(cmd => cmd.intent);
     
+    // 🆕 NEW: Enhanced prompt with business context
     const prompt = `
-Extract the intent and entities from this workforce management voice command: "${transcript}"
+Extract the intent and entities from this ${this.businessContext.domain} voice command: "${transcript}"
 
+Business Context: ${this.businessContext.name} - ${this.businessContext.capabilities.join(', ')}
 Available intents: ${availableIntents.join(', ')}
 
 Return ONLY valid JSON in this exact format:
 {
   "intent": "detected_intent",
   "entities": {
-    "taskName": "extracted task name if any",
-    "userName": "extracted user name if any",
-    "location": "extracted location if any",
-    "issueType": "extracted issue type if any"
+    "taskIdentifier": "extracted task number if any",
+    "recipient": "extracted person name if any", 
+    "messageContent": "extracted message if any",
+    "projectName": "extracted project if any",
+    "priorityLevel": "extracted priority if any"
   },
   "confidence": 0.8
 }
 
 Examples:
 - "clock me in" → {"intent": "clock_in", "entities": {}, "confidence": 0.9}
-- "mark database cleanup as done" → {"intent": "complete_task", "entities": {"taskName": "database cleanup"}, "confidence": 0.85}
-- "assign cleaning task to John" → {"intent": "assign_task", "entities": {"taskName": "cleaning task", "userName": "John"}, "confidence": 0.9}
+- "complete task 5" → {"intent": "complete_task_number", "entities": {"taskIdentifier": "5"}, "confidence": 0.9}
+- "send message to John about delay" → {"intent": "send_message", "entities": {"recipient": "John", "messageContent": "delay"}, "confidence": 0.85}
 `;
 
     const response = await Promise.race([
@@ -554,7 +854,7 @@ Examples:
   private async parseCommandWithAnthropic(transcript: string, config: AnthropicConfig): Promise<VoiceCommand> {
     const availableIntents = this.commandRegistry.commands.map(cmd => cmd.intent);
     
-    const prompt = `Extract intent and entities from: "${transcript}"\nAvailable intents: ${availableIntents.join(', ')}\nReturn JSON: {"intent": "...", "entities": {...}, "confidence": 0.8}`;
+    const prompt = `Extract intent and entities from: "${transcript}"\nBusiness: ${this.businessContext.name}\nAvailable intents: ${availableIntents.join(', ')}\nReturn JSON: {"intent": "...", "entities": {...}, "confidence": 0.8}`;
 
     const response = await Promise.race([
       fetch('https://api.anthropic.com/v1/messages', {
@@ -598,7 +898,7 @@ Examples:
   private async parseCommandWithGoogle(transcript: string, config: GoogleConfig): Promise<VoiceCommand> {
     const availableIntents = this.commandRegistry.commands.map(cmd => cmd.intent);
     
-    const prompt = `Extract intent and entities from: "${transcript}"\nAvailable intents: ${availableIntents.join(', ')}\nReturn JSON: {"intent": "...", "entities": {...}, "confidence": 0.8}`;
+    const prompt = `Extract intent and entities from: "${transcript}"\nBusiness: ${this.businessContext.name}\nAvailable intents: ${availableIntents.join(', ')}\nReturn JSON: {"intent": "...", "entities": {...}, "confidence": 0.8}`;
 
     const response = await Promise.race([
       fetch(`https://generativelanguage.googleapis.com/v1beta/models/${config.model || 'gemini-pro'}:generateContent?key=${config.apiKey}`, {
@@ -649,25 +949,25 @@ Examples:
       intent = commandMatch.intent;
       confidence = 0.8;
       
-      // Extract entities based on command validation rules
-      if (commandMatch.validation?.requiredEntities?.includes('taskName')) {
-        const taskMatch = transcript.match(/(?:complete|mark|finish|done)\s+(.+?)(?:\s+(?:as\s+)?(?:complete|done)|$)/i);
+      // 🆕 NEW: Enhanced entity extraction for keywords
+      if (commandMatch.validation?.requiredEntities?.includes('taskIdentifier')) {
+        const taskMatch = transcript.match(/task\s+(?:number\s+)?(\d+)/i);
         if (taskMatch) {
-          entities.taskName = taskMatch[1].trim();
+          entities.taskIdentifier = taskMatch[1];
         }
       }
       
-      if (commandMatch.validation?.requiredEntities?.includes('userName')) {
+      if (commandMatch.validation?.requiredEntities?.includes('recipient')) {
         const userMatch = transcript.match(/(?:to|for)\s+([a-zA-Z\s]+)/i);
         if (userMatch) {
-          entities.userName = userMatch[1].trim();
+          entities.recipient = userMatch[1].trim();
         }
       }
       
-      if (commandMatch.validation?.requiredEntities?.includes('location')) {
-        const locationMatch = transcript.match(/(?:at|to|in)\s+(.+)/i);
-        if (locationMatch) {
-          entities.location = locationMatch[1].trim();
+      if (commandMatch.validation?.requiredEntities?.includes('messageContent')) {
+        const messageMatch = transcript.match(/(?:about|regarding)\s+(.+)/i);
+        if (messageMatch) {
+          entities.messageContent = messageMatch[1].trim();
         }
       }
     } else {
@@ -684,7 +984,6 @@ Examples:
         intent = 'help';
         confidence = 0.9;
       }
-      // Add more keyword patterns as needed
     }
 
     return {
@@ -700,11 +999,17 @@ Examples:
   private async generateResponse(command: VoiceCommand): Promise<VoiceResponse> {
     const commandDef = getCommandByIntent(command.intent);
     
+    // 🆕 NEW: Enhanced classification
+    const classification = this.classifyCommand(command);
+    
     if (commandDef) {
       // Use command definition response
       let responseText = commandDef.response?.text || "I'll handle that for you.";
       
-      // Replace variables in response text
+      // 🆕 NEW: Replace business variables
+      responseText = this.replaceBusinessVariables(responseText);
+      
+      // Replace command-specific variables
       if (commandDef.response?.variables) {
         responseText = this.replaceTemplateVariables(responseText, command, commandDef.response.variables);
       }
@@ -712,24 +1017,44 @@ Examples:
       return {
         text: responseText,
         success: true,
+        canHandle: classification.canHandle,
+        shouldFallback: classification.shouldFallback,
+        fallbackReason: classification.fallbackReason,
+        intent: command.intent,
+        entities: command.entities,
+        commandType: classification.complexity,
+        businessContext: this.businessContext,
         actions: commandDef.action ? [commandDef.action] : undefined,
         suggestions: this.getSuggestedCommands()
       };
     }
     
-    // Fallback responses for unknown commands
+    // 🆕 NEW: Enhanced fallback responses with business context
     switch (command.intent) {
       case 'help':
+        const helpText = this.replaceBusinessVariables(
+          "I'm your {{businessName}} voice assistant! I can help you with {{capabilities}}. What would you like to do?"
+        );
         return {
-          text: "I can help you with time tracking, tasks, status checks, and more. Say 'show commands' to see everything I can do!",
+          text: helpText,
           success: true,
+          canHandle: true,
+          shouldFallback: false,
+          commandType: CommandComplexity.SIMPLE,
           suggestions: ['show commands', 'clock in', 'get my tasks', 'project status']
         };
         
       default:
+        const unknownText = this.replaceBusinessVariables(
+          "I'm not sure how to help with that in {{businessName}}. Try asking about {{capabilities}}."
+        );
         return {
-          text: "I'm not sure how to help with that. Try saying 'help' to see what I can do.",
+          text: unknownText,
           success: false,
+          canHandle: false,
+          shouldFallback: true,
+          fallbackReason: 'Unknown command',
+          commandType: CommandComplexity.BUSINESS,
           suggestions: this.getSuggestedCommands()
         };
     }
@@ -751,10 +1076,11 @@ Examples:
   private replaceTemplateVariables(text: string, command: VoiceCommand, variables: Record<string, string>): string {
     const allVariables = {
       timestamp: new Date().toISOString(),
-      taskName: command.entities.taskName || '',
-      userName: command.entities.userName || '',
-      location: command.entities.location || '',
-      issueType: command.entities.issueType || '',
+      taskIdentifier: command.entities.taskIdentifier || command.entities.taskName || '',
+      recipient: command.entities.recipient || command.entities.userName || '',
+      messageContent: command.entities.messageContent || '',
+      projectName: command.entities.projectName || '',
+      priorityLevel: command.entities.priorityLevel || '',
       rawText: command.rawText,
       confidence: command.confidence.toString(),
       ...variables
@@ -861,6 +1187,12 @@ Examples:
   updateConfig(newConfig: Partial<VoiceAIConfig>): void {
     this.config = { ...this.config, ...newConfig };
     
+    // 🆕 NEW: Update business context if changed
+    if (newConfig.businessContext) {
+      this.businessContext = this.initializeBusinessContext();
+      this.updateState({ businessContext: this.businessContext });
+    }
+    
     // Reinitialize command registry if commands config changed
     if (newConfig.commands) {
       this.commandRegistry = this.initializeCommandRegistry();
@@ -871,8 +1203,20 @@ Examples:
     this.config.context = { ...this.config.context, ...context };
   }
 
+  // 🆕 NEW: Update business context
+  updateBusinessContext(context: Partial<BusinessContext>): void {
+    this.businessContext = { ...this.businessContext, ...context };
+    this.updateState({ businessContext: this.businessContext });
+    this.eventListeners.onBusinessContextChanged?.(this.businessContext);
+  }
+
   getCommandRegistry(): CommandRegistry {
     return { ...this.commandRegistry };
+  }
+
+  // 🆕 NEW: Get business context
+  getBusinessContext(): BusinessContext {
+    return { ...this.businessContext };
   }
 
   async switchAIProvider(provider: AIProvider): Promise<void> {
@@ -925,7 +1269,8 @@ Examples:
       confidence: 1.0,
       rawText: `Executed: ${command.name}`,
       timestamp: new Date(),
-      provider: AIProvider.KEYWORDS
+      provider: AIProvider.KEYWORDS,
+      businessContext: this.businessContext
     };
 
     return this.generateResponse(voiceCommand);
