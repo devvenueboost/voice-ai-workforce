@@ -346,6 +346,7 @@ export interface VoiceResponse {
   commandType?: CommandComplexity; // Command complexity classification
   businessContext?: BusinessContext; // Business context used
   requiresApproval?: boolean; // Needs user confirmation before execution
+  confidence?: number;
 }
 
 export interface VoiceAIState {

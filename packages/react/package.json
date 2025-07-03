@@ -1,6 +1,6 @@
 {
   "name": "@voice-ai-workforce/react",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "React components with 3-tier interface modes for voice-controlled workforce applications",
   "main": "dist/react/src/index.js",
   "types": "dist/react/src/index.d.ts",
@@ -20,7 +20,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@voice-ai-workforce/types": "^1.0.6",
+    "@voice-ai-workforce/types": "^1.0.7",
     "@voice-ai-workforce/core": "^1.0.5"
   },
   "peerDependencies": {
