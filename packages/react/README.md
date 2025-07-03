@@ -1,10 +1,18 @@
 # @voice-ai-workforce/react
 
-> React components and hooks for voice-controlled workforce applications
+> React components with 3-tier interface modes for voice-controlled workforce applications
 
 [![npm](https://img.shields.io/npm/v/@voice-ai-workforce/react)](https://www.npmjs.com/package/@voice-ai-workforce/react)
 [![React](https://img.shields.io/badge/React-18+-green)](https://reactjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue)](https://www.typescriptlang.org/)
+
+## ✨ New: Mode-Aware React Components
+
+Components automatically adapt their interface based on mode configuration:
+
+**🔧 Developer Mode** - Full debug interface with technical details
+**🏢 Project Mode** - Balanced interface for business applications  
+**👤 End-User Mode** - Clean, simple interface for customers/employees
 
 ## 📦 Installation
 
@@ -12,578 +20,480 @@
 npm install @voice-ai-workforce/react @voice-ai-workforce/core @voice-ai-workforce/types
 ```
 
-## 🚀 Quick Start
+## 🚀 Quick Start by Mode
+
+### End-User Mode (Customer-Facing)
 
 ```tsx
 import React from 'react';
 import { VoiceButton } from '@voice-ai-workforce/react';
 
-function App() {
+function CustomerApp() {
   const config = {
-    speechToText: { provider: 'web-speech' as any, language: 'en-US' },
-    textToSpeech: { provider: 'web-speech' as any, speed: 1.0 },
-    aiProvider: { provider: 'openai' as any, model: 'gpt-3.5-turbo' },
-    responseMode: 'both' as any
+    speechToText: { provider: 'web-speech' as any },
+    textToSpeech: { provider: 'web-speech' as any },
+    aiProvider: { provider: 'openai' as any },
+    responseMode: 'both' as any,
+    interfaceMode: 'end-user' as any
   };
-
-  return (
-    <VoiceButton
-      config={config}
-      size="lg"
-      variant="primary"
-      onCommand={(cmd) => console.log('Command:', cmd)}
-      onResponse={(res) => console.log('Response:', res)}
-    />
-  );
-}
-```
-
-## 🧰 Components
-
-### VoiceButton
-
-A beautiful, accessible voice control button with visual feedback.
-
-```tsx
-<VoiceButton
-  config={voiceConfig}
-  size="md"           // sm | md | lg | xl
-  variant="primary"   // primary | secondary | ghost | danger
-  disabled={false}
-  onCommand={handleCommand}
-  onResponse={handleResponse}
-  onError={handleError}
-  className="custom-class"
-  aria-label="Voice commands"
-/>
-```
-
-#### Props
-
-```typescript
-interface VoiceButtonProps {
-  config: VoiceAIConfig;
-  size?: VoiceButtonSize;
-  variant?: VoiceButtonVariant;
-  disabled?: boolean;
-  onCommand?: (command: VoiceCommand) => void;
-  onResponse?: (response: VoiceResponse) => void;
-  onError?: (error: string) => void;
-  className?: string;
-  children?: React.ReactNode;
-  listenText?: string;
-  stopText?: string;
-  'aria-label'?: string;
-}
-```
-
-#### Sizes
-
-| Size | Dimensions | Use Case |
-|------|------------|----------|
-| `sm` | 32px × 32px | Compact interfaces |
-| `md` | 48px × 48px | Standard buttons |
-| `lg` | 64px × 64px | Primary actions |
-| `xl` | 80px × 80px | Hero interfaces |
-
-#### Variants
-
-| Variant | Description | Use Case |
-|---------|-------------|----------|
-| `primary` | Blue theme | Main voice control |
-| `secondary` | Gray theme | Secondary actions |
-| `ghost` | Transparent | Subtle integration |
-| `danger` | Red theme | Emergency/stop actions |
-
-#### States
-
-- **Idle** - Ready to listen (microphone icon)
-- **Listening** - Actively recording (stop icon + pulse)
-- **Processing** - Analyzing speech (loading spinner)
-- **Error** - Something went wrong (error indicator)
-
-## 🪝 Hooks
-
-### useVoiceAI
-
-The core hook for voice AI integration.
-
-```tsx
-import { useVoiceAI } from '@voice-ai-workforce/react';
-
-function CustomVoiceComponent() {
-  const {
-    isListening,
-    isProcessing,
-    isAvailable,
-    currentCommand,
-    lastResponse,
-    error,
-    startListening,
-    stopListening,
-    processText,
-    speak,
-    updateConfig,
-    updateContext,
-    getState
-  } = useVoiceAI({
-    config: voiceConfig,
-    onCommand: handleCommand,
-    onResponse: handleResponse,
-    onError: handleError,
-    autoStart: false
-  });
 
   return (
     <div>
-      <button onClick={isListening ? stopListening : startListening}>
-        {isListening ? 'Stop' : 'Start'} Listening
-      </button>
-      
-      {isProcessing && <div>Processing...</div>}
-      {error && <div>Error: {error}</div>}
-      {lastResponse && <div>Response: {lastResponse.text}</div>}
+      <h1>Customer Support</h1>
+      <VoiceButton
+        config={config}
+        customLabels={{
+          voiceButton: {
+            startText: 'Ask for Help',
+            stopText: 'Stop',
+            processingText: 'Listening...'
+          }
+        }}
+        onCommand={(command) => {
+          // Command is filtered - only essential info
+          console.log('Customer said:', command.rawText);
+        }}
+        onError={(error) => {
+          // Error is user-friendly
+          console.log('Simple error:', error.message); // "Voice assistant unavailable"
+        }}
+      />
+      {/* User sees: Simple "Ask for Help" button, no technical details */}
     </div>
   );
 }
 ```
 
-#### Options
-
-```typescript
-interface UseVoiceAIOptions {
-  config: VoiceAIConfig;
-  onCommand?: (command: VoiceCommand) => void;
-  onResponse?: (response: VoiceResponse) => void;
-  onError?: (error: VoiceAIError) => void;
-  autoStart?: boolean;
-}
-```
-
-#### Return Value
-
-```typescript
-interface UseVoiceAIReturn {
-  // State
-  isListening: boolean;
-  isProcessing: boolean;
-  isAvailable: boolean;
-  currentCommand?: VoiceCommand;
-  lastResponse?: VoiceResponse;
-  error?: string;
-  
-  // Actions
-  startListening: () => Promise<void>;
-  stopListening: () => Promise<void>;
-  processText: (text: string) => Promise<VoiceResponse | undefined>;
-  speak: (text: string) => Promise<void>;
-  
-  // Configuration
-  updateConfig: (newConfig: Partial<VoiceAIConfig>) => void;
-  updateContext: (context: Record<string, any>) => void;
-  
-  // Utils
-  getState: () => VoiceAIState;
-}
-```
-
-## 🎨 Styling
-
-### Tailwind CSS (Recommended)
-
-The components are built with Tailwind CSS. Include Tailwind in your project:
-
-```bash
-npm install tailwindcss
-```
-
-```css
-/* styles.css */
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-```
-
-### Custom CSS
-
-If not using Tailwind, you can override the styles:
-
-```css
-.voice-button {
-  /* Your custom styles */
-  background: #3b82f6;
-  border-radius: 50%;
-  border: 2px solid #3b82f6;
-}
-
-.voice-button:hover {
-  background: #2563eb;
-}
-
-.voice-button.listening {
-  animation: pulse 2s infinite;
-}
-```
-
-### CSS Modules
+### Project Mode (Business Admin)
 
 ```tsx
-import styles from './VoiceButton.module.css';
+import React from 'react';
+import { VoiceButton, VoiceCommandCenter } from '@voice-ai-workforce/react';
 
-<VoiceButton
-  config={config}
-  className={styles.customButton}
-/>
-```
-
-## 📱 Responsive Design
-
-All components are mobile-first and responsive:
-
-```tsx
-// Responsive sizing
-<VoiceButton
-  config={config}
-  size="md"           // Desktop
-  className="lg:w-20 lg:h-20 md:w-16 md:h-16 w-12 h-12"
-/>
-
-// Mobile-specific behavior
-<VoiceButton
-  config={{
-    ...config,
-    speechToText: {
-      ...config.speechToText,
-      continuous: false  // Better for mobile
-    }
-  }}
-/>
-```
-
-## ♿ Accessibility
-
-Components follow WAI-ARIA guidelines:
-
-- **Keyboard Navigation** - Full keyboard support
-- **Screen Readers** - Proper ARIA labels and roles
-- **Focus Management** - Visible focus indicators
-- **Color Contrast** - WCAG AA compliant
-- **Voice Alternatives** - Text input fallbacks
-
-```tsx
-<VoiceButton
-  config={config}
-  aria-label="Voice commands for task management"
-  role="button"
-  tabIndex={0}
-  onKeyPress={(e) => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      // Handle keyboard activation
-    }
-  }}
-/>
-```
-
-## 🎯 Examples
-
-### Field Worker Interface
-
-```tsx
-import { VoiceButton, UserRole } from '@voice-ai-workforce/react';
-
-function FieldWorkerApp() {
+function AdminDashboard() {
   const config = {
-    speechToText: { provider: 'web-speech' as any, language: 'en-US' },
-    textToSpeech: { provider: 'web-speech' as any, speed: 1.0 },
-    aiProvider: { provider: 'openai' as any, model: 'gpt-3.5-turbo' },
-    context: {
-      userRole: UserRole.FIELD_WORKER,
-      endpoints: {
-        clockIn: '/api/timesheet/clock-in',
-        updateTask: '/api/tasks/update'
-      }
-    }
+    speechToText: { provider: 'web-speech' as any },
+    textToSpeech: { provider: 'web-speech' as any },
+    aiProvider: { provider: 'openai' as any },
+    responseMode: 'both' as any,
+    interfaceMode: 'project' as any
   };
 
-  const handleCommand = (command) => {
-    switch (command.intent) {
-      case 'clock_in':
-        // Handle clock in
-        break;
-      case 'complete_task':
-        // Handle task completion
-        break;
+  return (
+    <div>
+      <h1>Admin Dashboard</h1>
+      
+      <VoiceButton
+        config={config}
+        showMiniCenter={true}
+        onCommand={(command) => {
+          // Command includes business-relevant info
+          console.log('Admin command:', {
+            intent: command.intent,
+            confidence: command.confidence, // Available in project mode
+            provider: command.provider      // Available in project mode
+          });
+        }}
+      />
+      
+      <VoiceCommandCenter
+        config={config}
+        isOpen={true}
+        showCategories={true}
+        showHistory={true}
+      />
+      
+      {/* Admin sees: Provider info, confidence scores, settings panel */}
+    </div>
+  );
+}
+```
+
+### Developer Mode (Full Debug)
+
+```tsx
+import React from 'react';
+import { VoiceButton, VoiceCommandCenter } from '@voice-ai-workforce/react';
+
+function DeveloperConsole() {
+  const config = {
+    speechToText: { provider: 'web-speech' as any },
+    textToSpeech: { provider: 'web-speech' as any },
+    aiProvider: { provider: 'openai' as any },
+    responseMode: 'both' as any,
+    interfaceMode: 'developer' as any,
+    visibility: {
+      showDebugInfo: true,
+      showProcessingTimes: true,
+      showTechnicalErrors: true
     }
   };
 
   return (
-    <div className="flex flex-col items-center space-y-4 p-6">
-      <h1 className="text-2xl font-bold">Field Operations</h1>
+    <div>
+      <h1>Voice AI Developer Console</h1>
       
       <VoiceButton
         config={config}
-        size="xl"
-        variant="primary"
-        onCommand={handleCommand}
-        className="mb-4"
+        showMiniCenter={true}
+        onCommand={(command) => {
+          // Full command object with debug information
+          console.log('Full debug command:', {
+            intent: command.intent,
+            entities: command.entities,
+            confidence: command.confidence,
+            provider: command.provider,
+            processingTime: '245ms'
+          });
+        }}
+        onError={(error) => {
+          // Full technical error details
+          console.error('Technical error:', error.details);
+        }}
       />
       
-      <p className="text-gray-600 text-center">
-        Say: "clock in", "complete task", or "status"
-      </p>
+      <VoiceCommandCenter
+        config={config}
+        isOpen={true}
+        width={400}
+        showCategories={true}
+        showHistory={true}
+      />
+      
+      {/* Developer sees: All debug info, processing times, full errors, analytics */}
     </div>
   );
 }
 ```
 
-### Custom Voice Interface
+## 🧰 Updated Components
+
+### VoiceButton with Mode Support
+
+```tsx
+interface VoiceButtonProps {
+  config: VoiceAIConfig;
+  
+  // NEW: Mode override support
+  mode?: 'developer' | 'project' | 'end-user';
+  visibilityOverrides?: Partial<VisibilityConfig>;
+  customLabels?: Partial<CustomLabels>;
+  
+  // Existing props...
+  size?: 'sm' | 'md' | 'lg' | 'xl';
+  variant?: 'primary' | 'secondary' | 'ghost';
+  onCommand?: (command: VoiceCommand) => void;
+  onResponse?: (response: VoiceResponse) => void;
+  onError?: (error: VoiceAIError) => void;
+}
+```
+
+#### Mode-Specific Features
+
+| Feature | Developer | Project | End-User |
+|---------|-----------|---------|----------|
+| **Provider Status** | ✅ "OpenAI Connected" | ✅ "OpenAI Connected" | ❌ "Voice Assistant" |
+| **Confidence Scores** | ✅ 85.2% | ✅ 85% | ❌ Hidden |
+| **Error Details** | ✅ Stack traces | ⚠️ User-friendly | ❌ "Voice error" |
+| **Mini Center** | ✅ Full featured | ✅ Standard | ✅ Simplified |
+| **Debug Info** | ✅ Processing times | ❌ Hidden | ❌ Hidden |
+
+### VoiceCommandCenter with Mode Support
+
+```tsx
+<VoiceCommandCenter
+  config={config}
+  mode="project"              // Override global mode
+  visibilityOverrides={{      // Fine-tune what's shown
+    showAdvancedSettings: false,
+    showExportOptions: false
+  }}
+  customLabels={{             // Custom terminology
+    providers: {
+      generic: 'Smart Assistant'
+    }
+  }}
+  isOpen={true}
+  showCategories={true}
+  showHistory={true}
+/>
+```
+
+## 🪝 Updated Hooks
+
+### useVoiceAI with Mode Support
 
 ```tsx
 import { useVoiceAI } from '@voice-ai-workforce/react';
 
 function CustomVoiceInterface() {
-  const [commandHistory, setCommandHistory] = useState([]);
-  
   const {
     isListening,
-    isProcessing,
     startListening,
     stopListening,
-    processText
+    
+    // NEW: Mode-aware properties
+    visibility,  // What features are visible
+    labels      // Resolved text labels
   } = useVoiceAI({
     config,
+    mode: 'end-user',           // Component-level mode override
+    visibilityOverrides: {      // Fine-tune visibility
+      showMiniCenter: false
+    },
     onCommand: (command) => {
-      setCommandHistory(prev => [...prev, command]);
+      // Command is filtered based on mode
+      console.log(command.intent);    // Always available
+      console.log(command.confidence); // May be undefined in end-user mode
     }
   });
 
   return (
-    <div className="max-w-md mx-auto p-6">
-      <div className="flex items-center justify-center mb-6">
-        <button
-          onClick={isListening ? stopListening : startListening}
-          className={`w-20 h-20 rounded-full flex items-center justify-center ${
-            isListening 
-              ? 'bg-red-500 animate-pulse' 
-              : 'bg-blue-500 hover:bg-blue-600'
-          } text-white transition-all`}
-        >
-          {isProcessing ? (
-            <Spinner className="w-8 h-8" />
-          ) : isListening ? (
-            <Square className="w-8 h-8" />
-          ) : (
-            <Microphone className="w-8 h-8" />
-          )}
-        </button>
-      </div>
-
-      <input
-        type="text"
-        placeholder="Or type a command..."
-        onKeyPress={(e) => {
-          if (e.key === 'Enter') {
-            processText(e.target.value);
-            e.target.value = '';
-          }
-        }}
-        className="w-full p-3 border rounded-lg"
-      />
-
-      <div className="mt-4 space-y-2 max-h-60 overflow-y-auto">
-        {commandHistory.map((cmd, i) => (
-          <div key={i} className="p-2 bg-gray-100 rounded">
-            <strong>"{cmd.rawText}"</strong>
-            <div className="text-sm text-gray-600">
-              Intent: {cmd.intent} | Confidence: {(cmd.confidence * 100).toFixed(0)}%
-            </div>
-          </div>
-        ))}
-      </div>
+    <div>
+      <button onClick={isListening ? stopListening : startListening}>
+        {isListening ? labels.voiceButton.stopText : labels.voiceButton.startText}
+      </button>
+      
+      {/* Conditionally show features based on mode */}
+      {visibility.showDebugInfo && (
+        <div>Debug: Provider status, processing times, etc.</div>
+      )}
     </div>
   );
 }
 ```
 
-### Multiple Voice Buttons
+## 🎨 Mode-Aware Styling
+
+Components automatically adjust their appearance based on mode:
+
+```css
+/* Developer mode - Technical styling */
+.voice-button-developer {
+  border: 2px solid #3b82f6;
+  background: linear-gradient(45deg, #3b82f6, #1d4ed8);
+}
+
+/* Project mode - Professional styling */
+.voice-button-project {
+  border: 1px solid #6b7280;
+  background: #f9fafb;
+}
+
+/* End-user mode - Friendly styling */
+.voice-button-end-user {
+  border-radius: 50%;
+  background: linear-gradient(45deg, #10b981, #059669);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+```
+
+## 📱 Mode Examples
+
+### Multi-Mode Application
+
+Different parts of the same app using different modes:
 
 ```tsx
-function MultipleVoiceButtons() {
+function StaffluentApp() {
+  const globalConfig = {
+    speechToText: { provider: 'web-speech' as any },
+    textToSpeech: { provider: 'web-speech' as any },
+    aiProvider: { provider: 'openai' as any },
+    responseMode: 'both' as any,
+    interfaceMode: 'project' as any // Global default
+  };
+
   return (
-    <div className="grid grid-cols-2 gap-4">
-      {/* Emergency button */}
-      <VoiceButton
-        config={emergencyConfig}
-        size="lg"
-        variant="danger"
-        aria-label="Emergency voice commands"
-      />
+    <div>
+      <header>
+        <h1>Staffluent Dashboard</h1>
+        
+        {/* Admin section - developer mode */}
+        <VoiceCommandCenter
+          config={globalConfig}
+          mode="developer"  // Component override
+          isOpen={true}
+          position="right"
+        />
+      </header>
+
+      <main>
+        {/* User help - end-user mode */}
+        <div className="help-section">
+          <h2>Need Help?</h2>
+          <VoiceButton
+            config={globalConfig}
+            mode="end-user"  // Component override
+            customLabels={{
+              voiceButton: { startText: 'Ask Question' }
+            }}
+          />
+        </div>
+
+        {/* Manager section - uses global project mode */}
+        <VoiceButton
+          config={globalConfig}
+          showMiniCenter={true}
+        />
+      </main>
+    </div>
+  );
+}
+```
+
+### Dynamic Mode Switching
+
+```tsx
+function ModeTestInterface() {
+  const [currentMode, setCurrentMode] = useState<'developer' | 'project' | 'end-user'>('project');
+  
+  return (
+    <div>
+      <select value={currentMode} onChange={(e) => setCurrentMode(e.target.value as any)}>
+        <option value="developer">Developer Mode</option>
+        <option value="project">Project Mode</option>
+        <option value="end-user">End-User Mode</option>
+      </select>
       
-      {/* Standard operations */}
       <VoiceButton
-        config={standardConfig}
-        size="lg"
-        variant="primary"
-        aria-label="Standard voice commands"
-      />
-      
-      {/* Quick actions */}
-      <VoiceButton
-        config={quickConfig}
-        size="md"
-        variant="secondary"
-        aria-label="Quick voice actions"
-      />
-      
-      {/* Status check */}
-      <VoiceButton
-        config={statusConfig}
-        size="md"
-        variant="ghost"
-        aria-label="Status voice commands"
+        config={baseConfig}
+        mode={currentMode}
+        onCommand={(cmd) => {
+          // Response varies by mode
+          console.log(`Mode: ${currentMode}, Command:`, cmd);
+        }}
       />
     </div>
   );
 }
 ```
 
-## 🧪 Testing
-
-### Component Testing
+### Custom Visibility Configuration
 
 ```tsx
-import { render, fireEvent, screen } from '@testing-library/react';
+<VoiceButton
+  config={config}
+  mode="project"
+  visibilityOverrides={{
+    showConfidenceScores: true,  // Show confidence
+    showProviders: false,        // But hide provider names
+    showDebugInfo: false,        // No debug info
+    showMiniCenter: true         // Keep mini center
+  }}
+  customLabels={{
+    providers: {
+      generic: 'AI Assistant'    // Custom provider label
+    },
+    errors: {
+      generic: 'Assistant temporarily unavailable'
+    }
+  }}
+/>
+```
+
+## ♿ Mode-Aware Accessibility
+
+Accessibility features adapt to each mode:
+
+```tsx
+// End-user mode - simplified accessibility
+<VoiceButton
+  config={config}
+  mode="end-user"
+  aria-label="Voice assistant for customer support"
+  // Simple, clear labeling
+/>
+
+// Developer mode - detailed accessibility
+<VoiceButton
+  config={config}
+  mode="developer"
+  aria-label="Voice AI development console with debug information"
+  // Technical but comprehensive labeling
+/>
+```
+
+## 🧪 Testing Mode Behavior
+
+```tsx
+import { render, fireEvent } from '@testing-library/react';
 import { VoiceButton } from '@voice-ai-workforce/react';
 
-test('VoiceButton renders and handles clicks', () => {
-  const onCommand = jest.fn();
-  
-  render(
-    <VoiceButton
-      config={mockConfig}
-      onCommand={onCommand}
-      aria-label="Test voice button"
-    />
-  );
-  
-  const button = screen.getByLabelText('Test voice button');
-  fireEvent.click(button);
-  
-  expect(button).toBeInTheDocument();
-});
-```
-
-### Hook Testing
-
-```tsx
-import { renderHook, act } from '@testing-library/react';
-import { useVoiceAI } from '@voice-ai-workforce/react';
-
-test('useVoiceAI hook manages state correctly', () => {
-  const { result } = renderHook(() => 
-    useVoiceAI({ config: mockConfig })
-  );
-  
-  expect(result.current.isListening).toBe(false);
-  
-  act(() => {
-    result.current.startListening();
+describe('VoiceButton Mode Behavior', () => {
+  test('end-user mode hides technical details', () => {
+    const { container } = render(
+      <VoiceButton
+        config={mockConfig}
+        mode="end-user"
+        onCommand={jest.fn()}
+      />
+    );
+    
+    // Should not show provider information
+    expect(container.querySelector('[data-testid="provider-status"]')).toBeNull();
   });
   
-  expect(result.current.isListening).toBe(true);
+  test('developer mode shows all debug info', () => {
+    const { container } = render(
+      <VoiceButton
+        config={mockConfig}
+        mode="developer"
+        onCommand={jest.fn()}
+      />
+    );
+    
+    // Should show debug information
+    expect(container.querySelector('[data-testid="debug-info"]')).toBeInTheDocument();
+  });
 });
 ```
 
-## 🔗 Integration with Other Libraries
+## 🔧 Migration Guide
 
-### Next.js
-
-```tsx
-// pages/_app.tsx
-import type { AppProps } from 'next/app';
-import { VoiceAIProvider } from '@voice-ai-workforce/react';
-
-export default function App({ Component, pageProps }: AppProps) {
-  return (
-    <VoiceAIProvider config={globalVoiceConfig}>
-      <Component {...pageProps} />
-    </VoiceAIProvider>
-  );
-}
-```
-
-### React Router
+### From v1.x Components
 
 ```tsx
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { VoiceButton } from '@voice-ai-workforce/react';
+// Before (v1.x)
+<VoiceButton
+  config={config}
+  onCommand={handleCommand}
+/>
 
-function App() {
-  return (
-    <BrowserRouter>
-      <div className="app">
-        <header>
-          <VoiceButton config={config} />
-        </header>
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-        </Routes>
-      </div>
-    </BrowserRouter>
-  );
-}
+// After (v2.x) - Add mode selection
+<VoiceButton
+  config={config}
+  mode="end-user"              // Choose appropriate mode
+  customLabels={{              // Customize labels if needed
+    voiceButton: {
+      startText: 'Start Voice'
+    }
+  }}
+  onCommand={handleCommand}
+/>
 ```
 
-### State Management (Redux)
+## 🌟 Key Benefits
 
-```tsx
-import { useDispatch } from 'react-redux';
-import { VoiceButton } from '@voice-ai-workforce/react';
-import { executeVoiceCommand } from './store/voiceSlice';
+### Simplified Development
+- **One Component Set**: Same components work for all user types
+- **Automatic Filtering**: Information automatically filtered by mode
+- **Easy Customization**: Override mode and visibility at component level
 
-function VoiceControlledApp() {
-  const dispatch = useDispatch();
-  
-  const handleCommand = (command) => {
-    dispatch(executeVoiceCommand(command));
-  };
-  
-  return (
-    <VoiceButton
-      config={config}
-      onCommand={handleCommand}
-    />
-  );
-}
-```
+### Better User Experience
+- **Appropriate Complexity**: Each user sees the right level of detail
+- **Consistent Interface**: Familiar patterns across different modes
+- **Flexible Configuration**: Fine-tune what each user type sees
 
-## 📚 TypeScript Support
-
-Full TypeScript support with comprehensive type definitions:
-
-```tsx
-import type { 
-  VoiceButtonProps,
-  VoiceButtonSize,
-  VoiceButtonVariant,
-  UseVoiceAIOptions,
-  UseVoiceAIReturn
-} from '@voice-ai-workforce/react';
-
-// Fully typed component
-const TypedVoiceButton: React.FC<VoiceButtonProps> = (props) => {
-  return <VoiceButton {...props} />;
-};
-
-// Typed hook usage
-const voiceHook: UseVoiceAIReturn = useVoiceAI(options);
-```
+### Maintainable Code
+- **Type-Safe**: Full TypeScript support for all mode features
+- **Single Source**: One component codebase for all interfaces
+- **Easy Testing**: Test behavior in different modes
 
 ## 🔗 Related Packages
 
-- **[@voice-ai-workforce/core](../core)** - Core voice AI engine
-- **[@voice-ai-workforce/types](../types)** - TypeScript type definitions
+- **[@voice-ai-workforce/core](../core)** - Core engine with mode system
+- **[@voice-ai-workforce/types](../types)** - TypeScript definitions for modes
 
 ## 📄 License
 

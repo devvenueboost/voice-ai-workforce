@@ -1,4 +1,4 @@
-// examples/basic-demo/tailwind.config.js
+// examples/three-tier-demo/tailwind.config.js
 /** @type {import('tailwindcss').Config} */
 export default {
     content: [

@@ -1,9 +1,15 @@
 # @voice-ai-workforce/core
 
-> Core voice AI engine for workforce management applications
+> Core voice AI engine with 3-tier interface modes for workforce management applications
 
 [![npm](https://img.shields.io/npm/v/@voice-ai-workforce/core)](https://www.npmjs.com/package/@voice-ai-workforce/core)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue)](https://www.typescriptlang.org/)
+
+## ✨ New: 3-Tier Interface Mode System
+
+**🔧 Developer Mode** - Full technical interface with debug information
+**🏢 Project Mode** - Balanced interface for business applications  
+**👤 End-User Mode** - Clean, simple interface for employees/customers
 
 ## 📦 Installation
 
@@ -11,286 +17,277 @@
 npm install @voice-ai-workforce/core @voice-ai-workforce/types
 ```
 
-## 🚀 Quick Start
+## 🚀 Quick Start by Mode
+
+### Developer Mode (Full Debug)
 
 ```typescript
 import { VoiceAI } from '@voice-ai-workforce/core';
 
 const voiceAI = new VoiceAI({
-  speechToText: {
-    provider: 'web-speech',
-    language: 'en-US',
-    continuous: false
-  },
-  textToSpeech: {
-    provider: 'web-speech',
-    speed: 1.0
-  },
-  aiProvider: {
-    provider: 'openai',
-    model: 'gpt-3.5-turbo'
-  },
-  responseMode: 'both'
+  speechToText: { provider: 'web-speech', language: 'en-US' },
+  textToSpeech: { provider: 'web-speech', speed: 1.0 },
+  aiProvider: { provider: 'openai', model: 'gpt-3.5-turbo' },
+  responseMode: 'both',
+  
+  // NEW: Developer mode configuration
+  interfaceMode: 'developer',
+  visibility: {
+    showDebugInfo: true,
+    showProviders: true,
+    showConfidenceScores: true,
+    showProcessingTimes: true,
+    showTechnicalErrors: true
+  }
 });
 
-// Start listening
-await voiceAI.startListening();
-
-// Process text input
+// Get full debug information
 const response = await voiceAI.processTextInput("clock me in");
-console.log(response);
-
-// Speak response
-await voiceAI.speak("You are now clocked in");
+console.log('Full response with debug data:', response);
+// Response includes: provider info, confidence scores, processing times, etc.
 ```
 
-## 🎯 Features
+### Project Mode (Business Admin)
 
-- **Web Speech API Integration** - Native browser voice recognition
-- **Multi-Provider Support** - Web Speech, Azure, Google, OpenAI
-- **Smart Command Processing** - Natural language understanding
-- **Workforce Presets** - Pre-configured for different user roles
-- **Flexible Configuration** - Customizable for any use case
-- **TypeScript First** - Complete type safety
+```typescript
+const voiceAI = new VoiceAI({
+  speechToText: { provider: 'web-speech', language: 'en-US' },
+  textToSpeech: { provider: 'web-speech', speed: 1.0 },
+  aiProvider: { provider: 'openai', model: 'gpt-3.5-turbo' },
+  responseMode: 'both',
+  
+  // NEW: Project mode configuration
+  interfaceMode: 'project',
+  visibility: {
+    showProviders: true,        // Show provider names
+    showConfidenceScores: true, // Show confidence for quality
+    showDebugInfo: false,       // Hide technical details
+    showTechnicalErrors: false  // User-friendly errors
+  }
+});
 
-## 📖 API Reference
+// Get business-appropriate information
+const response = await voiceAI.processTextInput("assign task to John");
+console.log('Business response:', response);
+// Response includes: provider status, confidence, but no debug data
+```
 
-### VoiceAI Class
+### End-User Mode (Simple Interface)
 
-#### Constructor
+```typescript
+const voiceAI = new VoiceAI({
+  speechToText: { provider: 'web-speech', language: 'en-US' },
+  textToSpeech: { provider: 'web-speech', speed: 1.0 },
+  aiProvider: { provider: 'openai', model: 'gpt-3.5-turbo' },
+  responseMode: 'both',
+  
+  // NEW: End-user mode configuration
+  interfaceMode: 'end-user',
+  visibility: {
+    useGenericLabels: true,     // "Voice Assistant" not "OpenAI"
+    showProviders: false,       // Hide all provider info
+    showDebugInfo: false,       // No technical details
+    showConfidenceScores: false, // No confusing numbers
+    showTechnicalErrors: false,  // Friendly error messages
+    customLabels: {
+      errors: {
+        generic: 'Voice assistant is temporarily unavailable',
+        connection: 'Please check your connection',
+        permission: 'Microphone permission required'
+      }
+    }
+  }
+});
+
+// Get simple, user-friendly response
+const response = await voiceAI.processTextInput("help me");
+console.log('Simple response:', response);
+// Response includes: just the text and basic success flag
+```
+
+## 🎯 Mode Selection Guide
+
+| Use Case | Recommended Mode | Why |
+|----------|------------------|-----|
+| **Package Development** | Developer | Need all debug info and technical details |
+| **Business Admin Panel** | Project | Configuration + analytics without overwhelming detail |
+| **Employee Mobile App** | End-User | Clean interface focused on core functionality |
+| **Customer Support** | End-User | Simple "ask for help" without technical jargon |
+
+## 📖 Updated API Reference
+
+### VoiceAI Constructor
 
 ```typescript
 new VoiceAI(config: VoiceAIConfig, events?: Partial<VoiceAIEvents>)
 ```
 
-#### Methods
+#### New Mode-Aware Configuration
 
 ```typescript
-// Start/stop voice recognition
-async startListening(): Promise<void>
-async stopListening(): Promise<void>
-
-// Process text input manually
-async processTextInput(text: string): Promise<VoiceResponse>
-
-// Text-to-speech
-async speak(text: string): Promise<void>
-
-// Configuration
-updateConfig(newConfig: Partial<VoiceAIConfig>): void
-updateContext(context: Record<string, any>): void
-
-// State management
-getState(): VoiceAIState
-```
-
-### Workforce Utilities
-
-```typescript
-import { 
-  createWorkforceVoiceAI, 
-  createQuickWorkforceVoice,
-  WorkforcePresets 
-} from '@voice-ai-workforce/core';
-
-// Create workforce-specific instance
-const fieldWorkerAI = createQuickWorkforceVoice(
-  UserRole.FIELD_WORKER,
-  'https://your-api.com',
-  'your-api-key'
-);
-
-// Get preset configuration
-const presets = WorkforcePresets[UserRole.MANAGER];
-```
-
-## 🎭 User Roles & Presets
-
-### Field Worker
-- **Wake Word**: "Hey Workforce"
-- **Auto Listen**: True
-- **Commands**: Clock in/out, task updates, issue reporting
-- **Endpoints**: Timesheet, tasks, issues
-
-### Manager  
-- **Wake Word**: "Hey Manager"
-- **Auto Listen**: False
-- **Commands**: Task assignment, team status, project management
-- **Endpoints**: Team management, project status, assignments
-
-### Admin
-- **Wake Word**: "Hey Assistant"
-- **Auto Listen**: False  
-- **Commands**: Analytics, reports, system management
-- **Endpoints**: Analytics, reports, system status
-
-### Client
-- **Wake Word**: "Hey Support"
-- **Auto Listen**: False
-- **Commands**: Project status, support tickets
-- **Endpoints**: Client portal, support system
-
-## 🔧 Configuration
-
-### Speech Providers
-
-```typescript
-// Web Speech API (Default)
-speechToText: {
-  provider: 'web-speech',
-  language: 'en-US',
-  continuous: false
-}
-
-// Azure Cognitive Services
-speechToText: {
-  provider: 'azure',
-  apiKey: 'your-azure-key',
-  region: 'eastus',
-  language: 'en-US'
-}
-
-// Google Cloud Speech
-speechToText: {
-  provider: 'google',
-  apiKey: 'your-google-key',
-  language: 'en-US'
+interface VoiceAIConfig {
+  // Existing configuration...
+  speechToText: SpeechToTextConfig;
+  textToSpeech: TextToSpeechConfig;
+  aiProvider: AIProviderConfig;
+  
+  // NEW: Mode system
+  interfaceMode?: 'developer' | 'project' | 'end-user';
+  visibility?: VisibilityConfig;
 }
 ```
 
-### AI Providers
+#### Mode-Filtered Responses
+
+Responses are automatically filtered based on the current mode:
 
 ```typescript
-// OpenAI (Default)
-aiProvider: {
-  provider: 'openai',
-  apiKey: 'your-openai-key',
-  model: 'gpt-3.5-turbo'
+// Developer mode - full information
+{
+  text: "You are now clocked in",
+  success: true,
+  metadata: {
+    provider: "openai",
+    confidence: 0.95,
+    processingTime: 245,
+    cached: false
+  }
 }
 
-// Anthropic Claude
-aiProvider: {
-  provider: 'anthropic',
-  apiKey: 'your-anthropic-key',
-  model: 'claude-3-sonnet'
+// Project mode - business-relevant info
+{
+  text: "You are now clocked in", 
+  success: true,
+  metadata: {
+    provider: "openai",
+    confidence: 0.95
+    // processingTime filtered out
+  }
+}
+
+// End-user mode - minimal info
+{
+  text: "You are now clocked in",
+  success: true
+  // metadata filtered out completely
 }
 ```
 
-## 🎯 Command Processing
+## 🏗️ Workforce Mode Presets
 
-The core engine processes voice input through these stages:
-
-1. **Speech Recognition** - Convert speech to text
-2. **Intent Parsing** - Extract command intent and entities
-3. **Command Processing** - Execute business logic
-4. **Response Generation** - Create appropriate response
-5. **Action Execution** - Perform API calls or system actions
-6. **Text-to-Speech** - Speak response to user
-
-### Built-in Commands
-
-- `clock_in` / `clock_out` - Time tracking
-- `complete_task` - Task management  
-- `get_status` - Status checking
-- `help` - Show available commands
-- `create_report` - Generate reports
-- `assign_task` - Task delegation
-
-### Custom Commands
+Updated workforce utilities with mode awareness:
 
 ```typescript
-// Add custom command handler
-voiceAI.addCommandHandler('custom_command', async (command) => {
-  // Your custom logic here
-  return {
-    text: "Custom command executed",
-    success: true,
-    data: { /* custom data */ }
-  };
+import { createWorkforceVoiceAI, WorkforcePresets } from '@voice-ai-workforce/core';
+
+// Create role-specific instance with appropriate mode
+const fieldWorkerAI = createWorkforceVoiceAI({
+  userRole: 'field_worker',
+  permissions: ['clock:in', 'clock:out'],
+  endpoints: { clockIn: '/api/clock-in' }
+}, {
+  // Field workers get end-user mode for simplicity
+  interfaceMode: 'end-user'
+});
+
+const managerAI = createWorkforceVoiceAI({
+  userRole: 'manager', 
+  permissions: ['assign:tasks', 'view:analytics'],
+  endpoints: { assignTask: '/api/tasks/assign' }
+}, {
+  // Managers get project mode for configuration
+  interfaceMode: 'project'
 });
 ```
 
-## 🌐 Browser Support
+## 🔧 Mode-Aware Error Handling
 
-- **Chrome**: Full support (recommended)
-- **Firefox**: Full support  
-- **Safari**: iOS 14.5+ required
-- **Edge**: Full support (Chromium-based)
-
-**Requirements:**
-- HTTPS connection
-- Microphone permissions
-- Modern browser with ES2020+ support
-
-## 📊 Performance
-
-- **Bundle Size**: ~30KB gzipped
-- **Initialization**: <200ms
-- **Command Processing**: <500ms average
-- **Memory Usage**: ~5MB typical
-- **Battery Impact**: Minimal on mobile
-
-## 🔒 Security
-
-- **Client-side Processing** - No data leaves your environment by default
-- **Configurable Privacy** - Choose what to send to external APIs
-- **HTTPS Required** - Secure connection mandatory
-- **Permission-based** - Explicit user consent for microphone access
-
-## 🧪 Testing
-
-```bash
-# Run core package tests
-npm test
-
-# Test specific functionality
-npm test -- --testNamePattern="VoiceAI"
-
-# Test with coverage
-npm test -- --coverage
-```
-
-## 📚 Examples
-
-### Basic Usage
+Errors are filtered based on the current mode:
 
 ```typescript
-import { VoiceAI } from '@voice-ai-workforce/core';
+// Developer mode - full technical details
+{
+  code: 'OPENAI_API_ERROR',
+  message: 'OpenAI API request failed: 429 Rate limit exceeded',
+  details: {
+    statusCode: 429,
+    headers: {...},
+    stack: '...'
+  },
+  suggestions: ['Check API key', 'Implement rate limiting']
+}
 
-const ai = new VoiceAI(config);
-ai.startListening();
+// Project mode - business-friendly technical info
+{
+  code: 'API_ERROR',
+  message: 'Voice service temporarily unavailable due to rate limits',
+  suggestions: ['Try again in a moment', 'Check service status']
+}
+
+// End-user mode - simple, friendly message
+{
+  code: 'VOICE_ERROR',
+  message: 'Voice assistant is temporarily unavailable',
+  suggestions: ['Please try again']
+}
 ```
 
-### With Event Handlers
+## 🎯 Migration from v1.x
 
+### Before (v1.x)
 ```typescript
-const ai = new VoiceAI(config, {
-  onCommand: (cmd) => console.log('Command:', cmd),
-  onResponse: (res) => console.log('Response:', res),
-  onError: (err) => console.error('Error:', err),
-  onStateChange: (state) => console.log('State:', state)
+const voiceAI = new VoiceAI({
+  speechToText: { provider: 'web-speech' },
+  aiProvider: { provider: 'openai' }
+  // Fixed interface for everyone
 });
 ```
 
-### API Integration
-
+### After (v2.x) - Choose Your Mode
 ```typescript
-const ai = new VoiceAI({
-  apiBaseUrl: 'https://your-api.com',
-  apiKey: 'your-key',
-  context: {
-    endpoints: {
-      clockIn: '/timesheet/clock-in',
-      updateTask: '/tasks/:id/update'
-    }
+const voiceAI = new VoiceAI({
+  speechToText: { provider: 'web-speech' },
+  aiProvider: { provider: 'openai' },
+  
+  // NEW: Interface mode selection
+  interfaceMode: 'end-user', // or 'project' or 'developer'
+  visibility: {
+    showProviders: false,      // Hide "OpenAI" from end users
+    useGenericLabels: true,    // Show "Voice Assistant"
+    showDebugInfo: false       // No technical details
   }
 });
 ```
 
+## ✨ Key Benefits of Mode System
+
+### For Developers
+- **Full Debugging**: See provider details, confidence scores, processing times
+- **Complete Error Info**: Stack traces and technical details
+- **Advanced Analytics**: All metrics and performance data
+
+### For Project Managers  
+- **Business Configuration**: Provider status and settings without overwhelming detail
+- **Quality Metrics**: Confidence scores for monitoring
+- **Professional Interface**: Technical but user-friendly
+
+### For End Users
+- **Clean Interface**: "Voice Assistant" instead of "OpenAI API"
+- **Friendly Errors**: "Voice unavailable" instead of "HTTP 429 error"
+- **Focus on Tasks**: No technical distractions
+
+## 🌐 Browser Support
+
+Mode system works across all supported browsers with no additional requirements.
+
+## 📚 Examples
+
+See updated examples in the [API Reference](./docs/api-reference.md) and [Examples](./docs/examples.md) documentation.
+
 ## 🔗 Related Packages
 
-- **[@voice-ai-workforce/react](../react)** - React components and hooks
-- **[@voice-ai-workforce/types](../types)** - TypeScript type definitions
+- **[@voice-ai-workforce/react](../react)** - React components with mode support
+- **[@voice-ai-workforce/types](../types)** - TypeScript definitions for mode system
 
 ## 📄 License
 

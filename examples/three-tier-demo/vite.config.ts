@@ -1,4 +1,4 @@
-// examples/basic-demo/vite.config.ts
+// examples/three-tier-demo/vite.config.ts
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
