@@ -1,363 +1,664 @@
-# Troubleshooting Guide
+# Voice AI Workforce - Complete Troubleshooting Guide
 
-## Installation Issues
+## 🆕 Mode-Related Issues
 
-### Package Not Found
+### Mode Not Working or Showing Wrong Interface
 
-**Problem:**
-```bash
-Module not found: Can't resolve '@voice-ai-workforce/core'
-```
+**Problem:** Interface mode not applying correctly or showing wrong level of detail
 
-**Solutions:**
-```bash
-# Check if packages are built
-cd voice-ai-workforce
-npm run build:sequential
-
-# Check if packages exist in node_modules
-ls -la node_modules/@voice-ai-workforce/
-
-# If using local development, ensure packages are copied/linked
-npm link @voice-ai-workforce/types @voice-ai-workforce/core @voice-ai-workforce/react
-```
-
-### TypeScript Compilation Errors
-
-**Problem:**
+**Diagnostic Steps:**
 ```typescript
-TS2307: Cannot find module '@voice-ai-workforce/types' or its corresponding type declarations.
-```
-
-**Solutions:**
-```bash
-# Ensure types package is built
-cd packages/types && npm run build
-
-# Add to tsconfig.json
-{
-  "compilerOptions": {
-    "moduleResolution": "node",
-    "esModuleInterop": true,
-    "skipLibCheck": true
-  }
-}
-
-# If using local packages, verify dist folder exists
-ls -la packages/types/dist/
-```
-
-### Import/Export Issues
-
-**Problem:**
-```typescript
-import { VoiceAI } from '@voice-ai-workforce/core';
-// TypeError: VoiceAI is not a constructor
-```
-
-**Solutions:**
-```typescript
-// Try different import syntax
-import { VoiceAI } from '@voice-ai-workforce/core';
-// or
-const { VoiceAI } = require('@voice-ai-workforce/core');
-
-// Check if module is properly exported
-console.log(require('@voice-ai-workforce/core'));
-```
-
-## Voice Recognition Issues
-
-### Microphone Access Denied
-
-**Problem:** Browser blocks microphone access
-
-**Solutions:**
-```javascript
-// Check microphone permissions
-navigator.permissions.query({ name: 'microphone' }).then(result => {
-  console.log('Microphone permission:', result.state);
-  if (result.state === 'denied') {
-    alert('Please enable microphone access in browser settings');
-  }
-});
-
-// Handle permission errors gracefully
-const voiceAI = new VoiceAI(config, {
-  onError: (error) => {
-    if (error.code === 'START_LISTENING_FAILED') {
-      console.log('Microphone access required');
-      // Show instructions to enable microphone
-    }
-  }
-});
-```
-
-### Speech Recognition Not Working
-
-**Problem:** Voice recognition doesn't start or stops immediately
-
-**Solutions:**
-```javascript
-// Check browser support
-const hasRecognition = 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
-if (!hasRecognition) {
-  console.log('Speech recognition not supported in this browser');
-  // Show text input fallback
-}
-
-// Check HTTPS requirement
-if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
-  console.log('Speech recognition requires HTTPS in production');
-}
-
-// Debug speech recognition events
-const voiceAI = new VoiceAI(config, {
-  onStateChange: (state) => {
-    console.log('Voice AI state:', state);
-  },
-  onError: (error) => {
-    console.log('Voice AI error:', error);
-  }
-});
-```
-
-### No Speech Recognition Results
-
-**Problem:** Speech recognition starts but doesn't capture speech
-
-**Solutions:**
-```javascript
-// Check microphone levels
-navigator.mediaDevices.getUserMedia({ audio: true })
-  .then(stream => {
-    const audioContext = new AudioContext();
-    const analyser = audioContext.createAnalyser();
-    const microphone = audioContext.createMediaStreamSource(stream);
-    microphone.connect(analyser);
-    
-    // Check if audio is being captured
-    const dataArray = new Uint8Array(analyser.frequencyBinCount);
-    analyser.getByteFrequencyData(dataArray);
-    const volume = dataArray.reduce((a, b) => a + b) / dataArray.length;
-    console.log('Microphone volume level:', volume);
-  })
-  .catch(err => console.log('Microphone error:', err));
-
-// Try different language settings
+// 1. Check mode configuration
 const config = {
-  speechToText: {
-    provider: SpeechProvider.WEB_SPEECH,
-    language: 'en-US', // Try 'en-GB', 'en-AU', etc.
-    continuous: false,
-  },
-  // ... rest of config
-};
-```
-
-## Speech Synthesis Issues
-
-### Text-to-Speech Not Working
-
-**Problem:** Speech synthesis doesn't play audio
-
-**Solutions:**
-```javascript
-// Check browser support
-if (!('speechSynthesis' in window)) {
-  console.log('Speech synthesis not supported');
-  // Disable text-to-speech features
-}
-
-// Check if voices are available
-speechSynthesis.addEventListener('voiceschanged', () => {
-  const voices = speechSynthesis.getVoices();
-  console.log('Available voices:', voices.length);
-  if (voices.length === 0) {
-    console.log('No voices available');
+  interfaceMode: 'end-user', // Verify this is set
+  visibility: {
+    showProviders: false, // Should be false for end-user
+    showDebugInfo: false,
+    showConfidenceScores: false
   }
-});
-
-// Debug speech synthesis
-const voiceAI = new VoiceAI(config, {
-  onResponse: (response) => {
-    console.log('Speaking:', response.text);
-  }
-});
-
-// Test speech synthesis directly
-speechSynthesis.speak(new SpeechSynthesisUtterance('Test'));
-```
-
-### Speech Synthesis Interruption
-
-**Problem:** Speech gets cut off or interrupted
-
-**Solutions:**
-```javascript
-// Ensure previous speech is completed
-const voiceAI = new VoiceAI({
-  ...config,
-  textToSpeech: {
-    provider: SpeechProvider.WEB_SPEECH,
-    speed: 0.9, // Slower speed can help
-  }
-});
-
-// Cancel previous speech before new one
-speechSynthesis.cancel();
-speechSynthesis.speak(utterance);
-```
-
-## Command Recognition Issues
-
-### Commands Not Recognized
-
-**Problem:** Voice commands don't trigger responses
-
-**Solutions:**
-```javascript
-// Test with text input first
-const voiceAI = new VoiceAI(config);
-
-// Test built-in commands
-const testCommands = ['help', 'clock me in', 'clock me out', 'complete task'];
-for (const command of testCommands) {
-  const response = await voiceAI.processTextInput(command);
-  console.log(`Command: "${command}" -> Response: "${response.text}"`);
-}
-
-// Check command processing
-const voiceAI = new VoiceAI(config, {
-  onCommand: (command) => {
-    console.log('Command received:', command);
-    console.log('Intent:', command.intent);
-    console.log('Confidence:', command.confidence);
-  }
-});
-```
-
-### Low Recognition Confidence
-
-**Problem:** Commands are recognized with low confidence
-
-**Solutions:**
-```javascript
-// Speak clearly and use exact phrases
-const suggestions = {
-  'help': 'Say "help" clearly',
-  'clock_in': 'Say "clock me in" or "start work"',
-  'clock_out': 'Say "clock me out" or "end work"',
-  'complete_task': 'Say "complete [task name]" or "mark task done"'
 };
 
-// Check recognition results
-const voiceAI = new VoiceAI(config, {
-  onCommand: (command) => {
-    if (command.confidence < 0.5) {
-      console.log('Low confidence recognition:', command.rawText);
-      // Ask user to repeat
+// 2. Validate mode resolution
+const { visibility, labels } = useVoiceVisibility(config, mode, visibilityOverrides);
+console.log('Resolved visibility:', visibility);
+console.log('Resolved labels:', labels);
+```
+
+**Common Solutions:**
+```typescript
+// ❌ WRONG - Conflicting mode settings
+const config = {
+  interfaceMode: 'end-user',
+  visibility: {
+    showProviders: true, // Conflicts with end-user mode!
+    showDebugInfo: true  // Will be overridden
+  }
+};
+
+// ✅ CORRECT - Consistent mode settings
+const config = {
+  interfaceMode: 'end-user',
+  visibility: {
+    useGenericLabels: true,
+    customLabels: {
+      providers: { generic: 'Voice Assistant' }
     }
   }
-});
+};
 ```
 
-## React Integration Issues
+### Provider Information Visible in End-User Mode
 
-### Hook Not Updating# Troubleshooting Guide
+**Problem:** Technical provider names showing when they should be hidden
 
-## Installation Issues
+**Diagnosis:**
+```typescript
+// Check component props override global mode
+<VoiceButton
+  config={endUserConfig}
+  mode="developer" // ❌ This overrides config.interfaceMode!
+/>
 
-### NPM Installation Failures
-
-#### Error: `Module not found`
-
-**Problem:**
-```bash
-Module not found: Can't resolve '@voice-ai-workforce/core'
-```
-
-**Solutions:**
-```bash
-# Clear NPM cache
-npm cache clean --force
-
-# Delete node_modules and reinstall
-rm -rf node_modules package-lock.json
-npm install
-
-# Install specific versions
-npm install @voice-ai-workforce/core@latest
-```
-
-#### Error: `Peer dependency warnings`
-
-**Problem:**
-```bash
-npm WARN peer dep missing: react@>=16.8.0
+// Check visibility overrides
+<VoiceButton
+  config={endUserConfig}
+  visibilityOverrides={{
+    showProviders: true // ❌ This forces provider visibility
+  }}
+/>
 ```
 
 **Solutions:**
-```bash
-# Install missing peer dependencies
-npm install react@^18.0.0 react-dom@^18.0.0
+```typescript
+// ✅ CORRECT - Let global mode take precedence
+<VoiceButton config={endUserConfig} />
 
-# Or use legacy peer deps flag
-npm install --legacy-peer-deps
+// ✅ CORRECT - Explicit end-user mode
+<VoiceButton 
+  config={config} 
+  mode="end-user"
+  customLabels={{
+    providers: { generic: 'Voice Assistant' }
+  }}
+/>
 ```
 
-#### Error: `Package not found`
+### Custom Labels Not Updating
 
-**Problem:**
-```bash
-404 Not Found - GET https://registry.npmjs.org/@voice-ai-workforce/core
+**Problem:** Custom labels not showing or being overridden
+
+**Diagnosis:**
+```typescript
+// Check label precedence (highest to lowest):
+// 1. Component customLabels prop
+// 2. visibilityOverrides.customLabels  
+// 3. config.visibility.customLabels
+// 4. Mode defaults
+
+// Debug label resolution
+const effectiveLabels = {
+  voiceButton: { 
+    ...labels.voiceButton, 
+    ...propCustomLabels?.voiceButton 
+  },
+  errors: { 
+    ...labels.errors, 
+    ...propCustomLabels?.errors 
+  }
+};
+console.log('Final labels:', effectiveLabels);
 ```
 
 **Solutions:**
-```bash
-# Check package name spelling
-npm search voice-ai-workforce
+```typescript
+// ✅ Set labels at config level
+const config = {
+  interfaceMode: 'end-user',
+  visibility: {
+    customLabels: {
+      voiceButton: {
+        startText: 'Ask for Help',
+        stopText: 'Stop',
+        errorText: 'Voice Unavailable'
+      },
+      errors: {
+        generic: 'Voice assistant temporarily unavailable'
+      }
+    }
+  }
+};
 
-# Verify NPM registry
-npm config get registry
-
-# Reset to default registry
-npm config set registry https://registry.npmjs.org/
+// ✅ Override at component level
+<VoiceButton
+  config={config}
+  customLabels={{
+    voiceButton: { startText: 'Get Help' }
+  }}
+/>
 ```
 
-### TypeScript Compilation Errors
+## 📱 Installation Issues
 
-#### Error: `Cannot find module '@voice-ai-workforce/types'`
+### Mode Configuration Validation Errors
 
 **Problem:**
 ```typescript
-TS2307: Cannot find module '@voice-ai-workforce/types' or its corresponding type declarations.
+// TypeScript error: Mode interfaces not found
+import { VoiceInterfaceMode, VisibilityConfig } from '@voice-ai-workforce/types';
+// Error: Module not found
 ```
 
 **Solutions:**
 ```bash
-# Install types package
-npm install @voice-ai-workforce/types
+# Install/update types package
+npm install @voice-ai-workforce/types@latest
 
-# Add to tsconfig.json
+# Verify package exports
+npm list @voice-ai-workforce/types
+
+# Check TypeScript configuration
 {
   "compilerOptions": {
     "moduleResolution": "node",
-    "esModuleInterop": true,
-    "types": ["@voice-ai-workforce/types"]
+    "esModuleInterop": true
   }
 }
 ```
 
-#### Error: `Type imports not working`
+### Mode Preset Loading Issues
 
-**Problem:**
+**Problem:** Default mode configurations not loading
+
+**Diagnostic:**
 ```typescript
-import { VoiceAIConfig } from '@voice-ai-workforce/types';
-// Types not recognized
+// Check if mode presets are available
+import { DEFAULT_MODE_PRESETS } from '@voice-ai-workforce/types';
+console.log('Available presets:', DEFAULT_MODE_PRESETS);
+
+// Validate mode enum
+import { VoiceInterfaceMode } from '@voice-ai-workforce/types';
+console.log('Valid modes:', Object.values(VoiceInterfaceMode));
 ```
 
 **Solutions:**
 ```typescript
-// Use type-only imports
-import type { VoiceAIConfig } from '@voice-ai-workforce
+// ✅ Explicit mode validation
+const validateMode = (mode: string): VoiceInterfaceMode => {
+  const validModes = ['developer', 'project', 'end-user'];
+  if (!validModes.includes(mode)) {
+    console.warn(`Invalid mode: ${mode}, defaulting to 'end-user'`);
+    return 'end-user';
+  }
+  return mode as VoiceInterfaceMode;
+};
+```
+
+## 🎤 Voice Recognition Issues
+
+### Mode-Specific Error Messages
+
+**Same Error in Different Modes:**
+
+**Developer Mode:**
+```typescript
+// Full technical error with stack trace
+{
+  code: 'START_LISTENING_FAILED',
+  message: 'Failed to start listening: DOMException: The operation was aborted.',
+  details: {
+    name: 'AbortError',
+    stack: 'Error: at navigator.mediaDevices.getUserMedia...',
+    browser: 'Chrome 91.0.4472.124',
+    permissions: { microphone: 'prompt' }
+  },
+  recoverable: true,
+  suggestions: [
+    'Check microphone permissions in chrome://settings/content/microphone',
+    'Verify no other applications are using the microphone',
+    'Try refreshing the page and allowing microphone access'
+  ]
+}
+```
+
+**Project Mode:**
+```typescript
+// Technical but user-friendly error
+{
+  code: 'START_LISTENING_FAILED',
+  message: 'Unable to access microphone. Please check browser permissions.',
+  suggestions: [
+    'Allow microphone access when prompted',
+    'Check microphone settings in browser',
+    'Ensure microphone is not in use by other applications'
+  ]
+}
+```
+
+**End-User Mode:**
+```typescript
+// Simple user-friendly message
+{
+  code: 'VOICE_UNAVAILABLE',
+  message: 'Voice assistant is temporarily unavailable',
+  // No technical details exposed
+}
+```
+
+### Browser Support by Mode
+
+| Browser | Developer Mode | Project Mode | End-User Mode |
+|---------|---------------|--------------|---------------|
+| **Chrome** | ✅ Full debugging | ✅ Business features | ✅ Simple interface |
+| **Firefox** | ✅ All debug tools | ✅ Full functionality | ✅ User-friendly |
+| **Safari** | ⚠️ Limited debug | ✅ Works well | ✅ Optimized for mobile |
+| **Edge** | ✅ Complete support | ✅ All features | ✅ Clean interface |
+
+## ⚛️ React Integration Issues
+
+### Mode Prop Validation
+
+**Problem:** Component mode props not working as expected
+
+**Diagnostic:**
+```typescript
+// Check prop precedence
+const MyComponent = ({ config, mode, visibilityOverrides }) => {
+  // This order matters:
+  // 1. mode prop overrides config.interfaceMode
+  // 2. visibilityOverrides override mode defaults
+  // 3. customLabels override everything
+  
+  console.log('Config mode:', config.interfaceMode);
+  console.log('Prop mode:', mode);
+  console.log('Final mode:', mode || config.interfaceMode || 'end-user');
+};
+```
+
+**Solutions:**
+```typescript
+// ✅ CORRECT - Clear mode hierarchy
+<VoiceButton
+  config={baseConfig}       // interfaceMode: 'project'
+  mode="end-user"          // Overrides to 'end-user'
+  visibilityOverrides={{    // Fine-tune visibility
+    showMiniCenter: false
+  }}
+  customLabels={{          // Override specific labels
+    voiceButton: { startText: 'Ask Question' }
+  }}
+/>
+
+// ✅ CORRECT - Environment-based mode
+const getMode = () => {
+  if (process.env.NODE_ENV === 'development') return 'developer';
+  if (user.role === 'admin') return 'project';
+  return 'end-user';
+};
+```
+
+### Visibility Override Conflicts
+
+**Problem:** Visibility settings not applying consistently
+
+**Diagnosis:**
+```typescript
+// Debug visibility resolution
+const debugVisibility = (config, mode, overrides) => {
+  const baseVisibility = getModeDefaults(mode);
+  const configVisibility = config.visibility || {};
+  const finalVisibility = { ...baseVisibility, ...configVisibility, ...overrides };
+  
+  console.log('Mode defaults:', baseVisibility);
+  console.log('Config overrides:', configVisibility);
+  console.log('Prop overrides:', overrides);
+  console.log('Final visibility:', finalVisibility);
+  
+  return finalVisibility;
+};
+```
+
+## 🔧 Mode Debugging Tools
+
+### Mode Configuration Validator
+
+```typescript
+const validateModeConfig = (config: VoiceAIConfig) => {
+  const issues = [];
+  
+  // Check mode consistency
+  if (config.interfaceMode === 'end-user' && config.visibility?.showDebugInfo) {
+    issues.push('showDebugInfo conflicts with end-user mode');
+  }
+  
+  if (config.interfaceMode === 'end-user' && config.visibility?.showProviders) {
+    issues.push('showProviders should be false for end-user mode');
+  }
+  
+  // Check required labels for end-user mode
+  if (config.interfaceMode === 'end-user' && !config.visibility?.useGenericLabels) {
+    issues.push('end-user mode should use generic labels');
+  }
+  
+  // Validate custom labels
+  if (config.visibility?.customLabels) {
+    const required = ['voiceButton', 'errors'];
+    for (const section of required) {
+      if (!config.visibility.customLabels[section]) {
+        issues.push(`Missing custom labels for: ${section}`);
+      }
+    }
+  }
+  
+  return {
+    isValid: issues.length === 0,
+    issues,
+    recommendations: generateRecommendations(config)
+  };
+};
+
+// Usage
+const validation = validateModeConfig(myConfig);
+if (!validation.isValid) {
+  console.warn('Mode configuration issues:', validation.issues);
+  console.log('Recommendations:', validation.recommendations);
+}
+```
+
+### Mode Testing Checklist
+
+```typescript
+const testAllModes = async () => {
+  const modes = ['developer', 'project', 'end-user'];
+  const results = {};
+  
+  for (const mode of modes) {
+    console.log(`Testing ${mode} mode...`);
+    
+    const config = {
+      ...baseConfig,
+      interfaceMode: mode
+    };
+    
+    const { visibility, labels } = useVoiceVisibility(config);
+    
+    results[mode] = {
+      // Test visibility settings
+      showsProviders: visibility.showProviders,
+      showsDebugInfo: visibility.showDebugInfo,
+      showsConfidenceScores: visibility.showConfidenceScores,
+      
+      // Test labels
+      buttonText: labels.voiceButton.startText,
+      errorText: labels.errors.generic,
+      
+      // Test functionality
+      canShowMiniCenter: visibility.showMiniCenter,
+      canShowHistory: visibility.showCommandHistory,
+      canShowSettings: visibility.showAdvancedSettings
+    };
+  }
+  
+  console.table(results);
+  return results;
+};
+```
+
+### Component vs Global Mode Conflict Detector
+
+```typescript
+const detectModeConflicts = (config, componentProps) => {
+  const conflicts = [];
+  
+  // Check mode override
+  if (config.interfaceMode && componentProps.mode && 
+      config.interfaceMode !== componentProps.mode) {
+    conflicts.push({
+      type: 'mode_override',
+      message: `Component mode "${componentProps.mode}" overrides config mode "${config.interfaceMode}"`,
+      recommendation: 'Remove component mode prop or make them consistent'
+    });
+  }
+  
+  // Check visibility conflicts
+  if (componentProps.visibilityOverrides) {
+    const configVisibility = config.visibility || {};
+    Object.keys(componentProps.visibilityOverrides).forEach(key => {
+      if (configVisibility[key] !== componentProps.visibilityOverrides[key]) {
+        conflicts.push({
+          type: 'visibility_override',
+          setting: key,
+          configValue: configVisibility[key],
+          componentValue: componentProps.visibilityOverrides[key]
+        });
+      }
+    });
+  }
+  
+  return conflicts;
+};
+```
+
+## 🌍 Environment-Specific Troubleshooting
+
+### Development Environment (Developer Mode)
+
+**Common Issues:**
+```typescript
+// Console spam from debug logs
+const config = {
+  interfaceMode: 'developer',
+  advanced: {
+    debugMode: true // Only for development
+  }
+};
+
+// Too much technical information
+const developmentVisibility = {
+  showDebugInfo: true,
+  showProviders: true,
+  showConfidenceScores: true,
+  showProcessingTimes: true,
+  showTechnicalErrors: true,
+  showAdvancedSettings: true,
+  showAnalytics: true
+};
+```
+
+**Solutions:**
+```typescript
+// Use environment-based debug control
+const isDevelopment = process.env.NODE_ENV === 'development';
+
+const config = {
+  interfaceMode: isDevelopment ? 'developer' : 'project',
+  advanced: {
+    debugMode: isDevelopment
+  },
+  visibility: isDevelopment ? developmentVisibility : productionVisibility
+};
+```
+
+### Staging Environment (Project Mode)
+
+**Common Issues:**
+```typescript
+// Business features not visible to testers
+const stagingConfig = {
+  interfaceMode: 'project',
+  visibility: {
+    showProviders: true,        // Good for testing
+    showConfidenceScores: true, // Useful for QA
+    showAdvancedSettings: true, // Allow configuration testing
+    showDebugInfo: false,       // Hide technical noise
+    showTechnicalErrors: false  // Use business-friendly errors
+  }
+};
+```
+
+### Production Environment (End-User Mode)
+
+**Common Issues:**
+```typescript
+// Technical information leaking to users
+const productionConfig = {
+  interfaceMode: 'end-user',
+  visibility: {
+    useGenericLabels: true,
+    showProviders: false,
+    showDebugInfo: false,
+    showConfidenceScores: false,
+    showTechnicalErrors: false,
+    customLabels: {
+      voiceButton: {
+        startText: 'Start Voice',
+        stopText: 'Stop',
+        processingText: 'Listening...',
+        errorText: 'Voice Unavailable'
+      },
+      providers: {
+        generic: 'Voice Assistant'
+      },
+      errors: {
+        generic: 'Voice assistant is temporarily unavailable',
+        connection: 'Please check your internet connection',
+        permission: 'Microphone access is required'
+      }
+    }
+  }
+};
+```
+
+## 🧪 Validation Scripts
+
+### Quick Mode Validation
+
+```bash
+# Create a test script to validate your mode setup
+npm run test:modes
+
+# Or manual validation
+node -e "
+const { VoiceAI } = require('@voice-ai-workforce/core');
+const config = require('./your-config.js');
+
+console.log('Testing mode configuration...');
+const voiceAI = new VoiceAI(config);
+console.log('✅ Mode configuration is valid');
+"
+```
+
+### Environment Setup Validator
+
+```typescript
+// validate-environment.js
+const validateEnvironment = () => {
+  const env = process.env.NODE_ENV;
+  const checks = [];
+  
+  // Check mode configuration
+  if (env === 'production') {
+    checks.push({
+      name: 'Production Mode',
+      valid: config.interfaceMode === 'end-user',
+      message: 'Production should use end-user mode'
+    });
+  }
+  
+  if (env === 'development') {
+    checks.push({
+      name: 'Development Mode',
+      valid: config.interfaceMode === 'developer',
+      message: 'Development should use developer mode'
+    });
+  }
+  
+  // Check API key configuration
+  checks.push({
+    name: 'API Keys',
+    valid: !config.visibility?.showTechnicalErrors || !!process.env.VOICE_AI_API_KEY,
+    message: 'API keys required for technical error details'
+  });
+  
+  const failed = checks.filter(check => !check.valid);
+  if (failed.length > 0) {
+    console.error('❌ Environment validation failed:');
+    failed.forEach(check => console.error(`  - ${check.message}`));
+    process.exit(1);
+  }
+  
+  console.log('✅ Environment validation passed');
+};
+
+validateEnvironment();
+```
+
+## 🆘 Emergency Mode Reset
+
+If modes are completely broken, use this emergency reset:
+
+```typescript
+// emergency-reset.js
+const emergencyConfig = {
+  interfaceMode: 'end-user', // Safest mode
+  speechToText: { provider: 'web-speech' },
+  textToSpeech: { provider: 'web-speech' },
+  aiProvider: { provider: 'keywords' }, // Most reliable fallback
+  visibility: {
+    // Minimal safe settings
+    showProviders: false,
+    showDebugInfo: false,
+    showConfidenceScores: false,
+    showTechnicalErrors: false,
+    useGenericLabels: true,
+    customLabels: {
+      voiceButton: { startText: 'Voice' },
+      errors: { generic: 'Unavailable' }
+    }
+  }
+};
+
+// Test this works, then gradually add features back
+```
+
+## 📞 Getting Help
+
+### When to Contact Support
+
+**Mode Issues:** Configuration not working after following this guide
+**Integration Issues:** Problems integrating with your specific setup  
+**Performance Issues:** Mode switching causing performance problems
+**Custom Requirements:** Need custom mode configurations
+
+### Information to Include
+
+1. **Environment Details:**
+   ```typescript
+   console.log({
+     nodeEnv: process.env.NODE_ENV,
+     packageVersion: require('@voice-ai-workforce/core/package.json').version,
+     browser: navigator.userAgent,
+     mode: config.interfaceMode
+   });
+   ```
+
+2. **Configuration:**
+   ```typescript
+   // Sanitized config (remove API keys)
+   const sanitizedConfig = {
+     ...config,
+     apiKey: config.apiKey ? '[REDACTED]' : undefined
+   };
+   ```
+
+3. **Error Details:**
+   ```typescript
+   // Include the actual error and expected behavior
+   {
+     expected: 'end-user mode with no provider info',
+     actual: 'showing OpenAI provider name',
+     config: sanitizedConfig,
+     componentProps: { mode, visibilityOverrides }
+   }
+   ```
+
+Remember: The mode system is designed to be flexible - when in doubt, start with `end-user` mode and gradually add features as needed!
