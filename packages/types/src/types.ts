@@ -587,21 +587,3 @@ export function getEffectiveLabels(
   };
 }
 
-// Hook for components to get their effective configuration
-export function useVoiceVisibility(
-  config: VoiceAIConfig,
-  componentMode?: VoiceInterfaceMode,
-  componentOverrides?: Partial<VisibilityConfig>
-) {
-  const visibility = resolveVisibilityConfig(
-    config.interfaceMode,
-    componentMode,
-    config.visibility,
-    componentOverrides
-  );
-  
-  const labels = getEffectiveLabels(visibility, config.visibility?.customLabels);
-  
-  return { visibility, labels };
-}
-
