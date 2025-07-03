@@ -1,4 +1,4 @@
-// packages/react/src/__tests__/useVoiceAI.test.ts
+// packages/react/src/__tests__/useVoiceAI.test.ts - FIXED
 
 import { renderHook, act } from '@testing-library/react';
 import { useVoiceAI } from '../hooks/useVoiceAI';
@@ -57,12 +57,84 @@ jest.mock('../../../core/src/VoiceAI', () => ({
  }),
 }));
 
-// Mock the useVoiceVisibility hook
-jest.mock('../../../types/src/types', () => {
- const actual = jest.requireActual('../../../types/src/types');
- return {
-   ...actual,
-   useVoiceVisibility: jest.fn(() => ({
+// Mock the useVoiceVisibility hook - FIXED to use correct import path
+jest.mock('../hooks/useVoiceVisibility', () => ({
+ useVoiceVisibility: jest.fn(() => ({
+   visibility: {
+     showProviders: true,
+     showProviderStatus: true,
+     showDebugInfo: true,
+     showConfidenceScores: true,
+     showTechnicalErrors: true,
+     showAdvancedSettings: true,
+     showCommandHistory: true,
+     showMiniCenter: true,
+     showStatusIndicator: true,
+     useGenericLabels: false
+   },
+   labels: {
+     voiceButton: {
+       startText: 'Start Listening',
+       stopText: 'Stop Listening',
+       processingText: 'Processing voice...',
+       errorText: 'Voice error'
+     },
+     status: {
+       online: 'Online',
+       offline: 'Offline',
+       listening: 'Listening',
+       processing: 'Processing',
+       error: 'Error'
+     },
+     providers: {
+       generic: 'AI Provider',
+       fallback: 'Keywords'
+     },
+     errors: {
+       generic: 'An error occurred',
+       connection: 'Connection failed',
+       permission: 'Permission denied'
+     }
+   }
+ }))
+}));
+
+// Get the mocked constructor for assertions
+const { VoiceAI: MockVoiceAIConstructor } = jest.requireMock('../../../core/src/VoiceAI');
+const { useVoiceVisibility: mockUseVoiceVisibility } = jest.requireMock('../hooks/useVoiceVisibility');
+
+describe('useVoiceAI Hook', () => {
+ let mockConfig: VoiceAIConfig;
+
+ beforeEach(() => {
+   jest.clearAllMocks();
+   
+   mockConfig = {
+     aiProviders: {
+       primary: {
+         provider: AIProvider.OPENAI,
+         apiKey: 'test-key',
+         model: 'gpt-3.5-turbo'
+       },
+       fallbacks: [{
+         provider: AIProvider.KEYWORDS,
+         fallbackMode: true
+       }]
+     },
+     speechToText: {
+       provider: SpeechProvider.WEB_SPEECH,
+       language: 'en-US',
+     },
+     textToSpeech: {
+       provider: SpeechProvider.WEB_SPEECH,
+       speed: 1.0,
+     },
+     responseMode: ResponseMode.BOTH,
+     interfaceMode: 'developer' as VoiceInterfaceMode
+   };
+
+   // Reset the mock to return default values
+   mockUseVoiceVisibility.mockReturnValue({
      visibility: {
        showProviders: true,
        showProviderStatus: true,
@@ -99,49 +171,20 @@ jest.mock('../../../types/src/types', () => {
          permission: 'Permission denied'
        }
      }
-   }))
- };
-});
-
-// Get the mocked constructor for assertions
-const { VoiceAI: MockVoiceAIConstructor } = jest.requireMock('../../../core/src/VoiceAI');
-
-describe('useVoiceAI Hook', () => {
- let mockConfig: VoiceAIConfig;
- const useVoiceAIMock = require('../hooks/useVoiceAI').useVoiceAI;
-
- beforeEach(() => {
-   jest.clearAllMocks();
-   
-   mockConfig = {
-     aiProviders: {
-       primary: {
-         provider: AIProvider.OPENAI,
-         apiKey: 'test-key',
-         model: 'gpt-3.5-turbo'
-       },
-       fallbacks: [{
-         provider: AIProvider.KEYWORDS,
-         fallbackMode: true
-       }]
-     },
-     speechToText: {
-       provider: SpeechProvider.WEB_SPEECH,
-       language: 'en-US',
-     },
-     textToSpeech: {
-       provider: SpeechProvider.WEB_SPEECH,
-       speed: 1.0,
-     },
-     responseMode: ResponseMode.BOTH,
-     interfaceMode: 'developer' as VoiceInterfaceMode
-   };
+   });
  });
 
  describe('Initialization', () => {
    it('should initialize and create VoiceAI instance', async () => {
      const { result } = renderHook(() =>
        useVoiceAI({ config: mockConfig })
+     );
+
+     // Should call useVoiceVisibility hook
+     expect(mockUseVoiceVisibility).toHaveBeenCalledWith(
+       mockConfig,
+       undefined, // no component mode
+       undefined  // no overrides
      );
 
      // Should create VoiceAI instance with mode-aware config
@@ -151,7 +194,8 @@ describe('useVoiceAI Hook', () => {
          interfaceMode: 'developer',
          visibility: expect.objectContaining({
            showProviders: true,
-           showDebugInfo: true
+           showDebugInfo: true,
+           customLabels: expect.any(Object)
          })
        }),
        expect.objectContaining({
@@ -194,6 +238,205 @@ describe('useVoiceAI Hook', () => {
      expect(result.current.visibility).toBeDefined();
      expect(result.current.labels).toBeDefined();
    });
+
+   it('should handle component mode override', async () => {
+     const { result } = renderHook(() =>
+       useVoiceAI({ 
+         config: mockConfig,
+         mode: 'end-user' 
+       })
+     );
+
+     // Should call useVoiceVisibility with component mode
+     expect(mockUseVoiceVisibility).toHaveBeenCalledWith(
+       mockConfig,
+       'end-user', // component mode override
+       undefined   // no overrides
+     );
+
+     await act(async () => {
+       await new Promise(resolve => setTimeout(resolve, 10));
+     });
+
+     expect(result.current.visibility).toBeDefined();
+     expect(result.current.labels).toBeDefined();
+   });
+
+   it('should handle visibility overrides', async () => {
+     const visibilityOverrides = { showDebugInfo: false };
+     
+     const { result } = renderHook(() =>
+       useVoiceAI({ 
+         config: mockConfig,
+         visibilityOverrides 
+       })
+     );
+
+     // Should call useVoiceVisibility with overrides
+     expect(mockUseVoiceVisibility).toHaveBeenCalledWith(
+       mockConfig,
+       undefined,           // no component mode
+       visibilityOverrides  // visibility overrides
+     );
+
+     await act(async () => {
+       await new Promise(resolve => setTimeout(resolve, 10));
+     });
+
+     expect(result.current.visibility).toBeDefined();
+   });
+ });
+
+ describe('Mode-Aware Error Handling', () => {
+   it('should filter errors based on visibility settings', async () => {
+     // Mock visibility to hide technical errors
+     mockUseVoiceVisibility.mockReturnValue({
+       visibility: {
+         showTechnicalErrors: false,
+         showProviders: false,
+         showDebugInfo: false,
+         showConfidenceScores: false,
+         showAdvancedSettings: false,
+         showCommandHistory: true,
+         showMiniCenter: true,
+         showStatusIndicator: true,
+         useGenericLabels: true
+       },
+       labels: {
+         voiceButton: {
+           startText: 'Start Voice',
+           stopText: 'Stop Voice',
+           processingText: 'Processing...',
+           errorText: 'Voice Unavailable'
+         },
+         status: {
+           online: 'Voice Ready',
+           offline: 'Voice Unavailable',
+           listening: 'Listening...',
+           processing: 'Processing...',
+           error: 'Voice Error'
+         },
+         providers: {
+           generic: 'Voice Assistant',
+           fallback: 'Voice Assistant'
+         },
+         errors: {
+           generic: 'Voice assistant is temporarily unavailable',
+           connection: 'Please check your connection',
+           permission: 'Microphone permission required'
+         }
+       }
+     });
+
+     const onError = jest.fn();
+     
+     const { result } = renderHook(() =>
+       useVoiceAI({ 
+         config: mockConfig,
+         mode: 'end-user',
+         onError 
+       })
+     );
+
+     await act(async () => {
+       await new Promise(resolve => setTimeout(resolve, 10));
+     });
+
+     // Get the event handlers that were passed to VoiceAI
+     const voiceAICall = MockVoiceAIConstructor.mock.calls[0];
+     const eventHandlers = voiceAICall[1];
+
+     // Simulate an error from VoiceAI
+     const mockError = {
+       code: 'TECHNICAL_ERROR',
+       message: 'Complex technical error with stack trace',
+       details: { stack: 'Error stack trace...' }
+     };
+
+     act(() => {
+       eventHandlers.onError(mockError);
+     });
+
+     // Should call onError with filtered error (generic message)
+     expect(onError).toHaveBeenCalledWith({
+       code: 'TECHNICAL_ERROR',
+       message: 'Voice assistant is temporarily unavailable',
+       details: undefined // Technical details should be filtered out
+     });
+   });
+
+   it('should preserve technical errors when visibility allows', async () => {
+     // Mock visibility to show technical errors
+     mockUseVoiceVisibility.mockReturnValue({
+       visibility: {
+         showTechnicalErrors: true,
+         showProviders: true,
+         showDebugInfo: true,
+         showConfidenceScores: true,
+         showAdvancedSettings: true,
+         showCommandHistory: true,
+         showMiniCenter: true,
+         showStatusIndicator: true,
+         useGenericLabels: false
+       },
+       labels: {
+         voiceButton: {
+           startText: 'Start Listening',
+           stopText: 'Stop Listening',
+           processingText: 'Processing voice...',
+           errorText: 'Voice error'
+         },
+         status: {
+           online: 'Online',
+           offline: 'Offline',
+           listening: 'Listening',
+           processing: 'Processing',
+           error: 'Error'
+         },
+         providers: {
+           generic: 'AI Provider',
+           fallback: 'Keywords'
+         },
+         errors: {
+           generic: 'An error occurred',
+           connection: 'Connection failed',
+           permission: 'Permission denied'
+         }
+       }
+     });
+
+     const onError = jest.fn();
+     
+     const { result } = renderHook(() =>
+       useVoiceAI({ 
+         config: mockConfig,
+         mode: 'developer',
+         onError 
+       })
+     );
+
+     await act(async () => {
+       await new Promise(resolve => setTimeout(resolve, 10));
+     });
+
+     // Get the event handlers
+     const voiceAICall = MockVoiceAIConstructor.mock.calls[0];
+     const eventHandlers = voiceAICall[1];
+
+     // Simulate an error from VoiceAI
+     const mockError = {
+       code: 'TECHNICAL_ERROR',
+       message: 'Complex technical error with stack trace',
+       details: { stack: 'Error stack trace...' }
+     };
+
+     act(() => {
+       eventHandlers.onError(mockError);
+     });
+
+     // Should call onError with full error details
+     expect(onError).toHaveBeenCalledWith(mockError);
+   });
  });
 
  describe('Voice Control Functions', () => {
@@ -223,7 +466,7 @@ describe('useVoiceAI Hook', () => {
      expect(mockVoiceAI.stopListening).toHaveBeenCalled();
    });
 
-   it('should call processText and return response', async () => {
+   it('should call processText and return filtered response', async () => {
      const { result } = renderHook(() =>
        useVoiceAI({ config: mockConfig })
      );
@@ -292,10 +535,53 @@ describe('useVoiceAI Hook', () => {
 
      expect(mockVoiceAI.updateContext).toHaveBeenCalledWith(context);
    });
+
+   it('should filter context in end-user mode', async () => {
+     // Mock end-user mode visibility
+     mockUseVoiceVisibility.mockReturnValue({
+       visibility: {
+         showDebugInfo: false,
+         showProviders: false,
+         showTechnicalErrors: false,
+         showAdvancedSettings: false,
+         showCommandHistory: true,
+         showMiniCenter: true,
+         useGenericLabels: true
+       },
+       labels: {
+         voiceButton: { startText: 'Start Voice' },
+         status: { online: 'Voice Ready' },
+         providers: { generic: 'Voice Assistant' },
+         errors: { generic: 'Voice unavailable' }
+       }
+     });
+
+     const { result } = renderHook(() =>
+       useVoiceAI({ config: mockConfig, mode: 'end-user' })
+     );
+
+     const context = { 
+       userRole: 'manager',
+       debug_info: 'should be filtered',
+       internal_data: 'should be filtered',
+       public_data: 'should remain'
+     };
+
+     await act(async () => {
+       await new Promise(resolve => setTimeout(resolve, 10));
+       result.current.updateContext(context);
+     });
+
+     // Should filter out debug_ and internal_ prefixed properties
+     expect(mockVoiceAI.updateContext).toHaveBeenCalledWith({
+       userRole: 'manager',
+       public_data: 'should remain'
+     });
+   });
  });
 
  describe('State Management', () => {
-   it('should return state from getState', async () => {
+   it('should return filtered state from getState', async () => {
      const { result } = renderHook(() =>
        useVoiceAI({ config: mockConfig })
      );
@@ -308,22 +594,39 @@ describe('useVoiceAI Hook', () => {
      expect(state).toHaveProperty('isListening');
      expect(state).toHaveProperty('isProcessing');
      expect(state).toHaveProperty('isAvailable');
+     expect(state).toHaveProperty('activeProvider'); // Should be visible in developer mode
    });
 
-   it('should update state when VoiceAI state changes', async () => {
+   it('should filter state in end-user mode', async () => {
+     // Mock end-user mode visibility
+     mockUseVoiceVisibility.mockReturnValue({
+       visibility: {
+         showProviders: false,
+         showProviderStatus: false,
+         showDebugInfo: false,
+         showAdvancedSettings: false,
+         showCommandHistory: true
+       },
+       labels: {
+         voiceButton: { startText: 'Start Voice' },
+         status: { online: 'Voice Ready' },
+         providers: { generic: 'Voice Assistant' },
+         errors: { generic: 'Voice unavailable' }
+       }
+     });
+
      const { result } = renderHook(() =>
-       useVoiceAI({ config: mockConfig })
+       useVoiceAI({ config: mockConfig, mode: 'end-user' })
      );
 
-     // Initial state
-     expect(result.current.isAvailable).toBe(false);
-
-     // Wait for state change from mock
      await act(async () => {
        await new Promise(resolve => setTimeout(resolve, 10));
      });
 
-     expect(result.current.isAvailable).toBe(true);
+     const state = result.current.getState();
+     expect(state.activeProvider).toBeUndefined(); // Should be filtered out
+     expect(state.providerStatus).toBeUndefined(); // Should be filtered out
+     expect(state.commandHistory).toBeDefined(); // Should remain (allowed in end-user)
    });
  });
 
@@ -386,6 +689,38 @@ describe('useVoiceAI Hook', () => {
      });
 
      expect(mockVoiceAI.startListening).toHaveBeenCalled();
+   });
+
+   it('should not auto start when mini center is disabled', async () => {
+     // Mock visibility with mini center disabled
+     mockUseVoiceVisibility.mockReturnValue({
+       visibility: {
+         showMiniCenter: false,
+         showProviders: false,
+         showDebugInfo: false
+       },
+       labels: {
+         voiceButton: { startText: 'Start Voice' },
+         status: { online: 'Voice Ready' },
+         providers: { generic: 'Voice Assistant' },
+         errors: { generic: 'Voice unavailable' }
+       }
+     });
+
+     renderHook(() =>
+       useVoiceAI({ 
+         config: mockConfig, 
+         autoStart: true,
+         mode: 'end-user'
+       })
+     );
+
+     await act(async () => {
+       await new Promise(resolve => setTimeout(resolve, 10));
+     });
+
+     // Should not auto-start when mini center is disabled
+     expect(mockVoiceAI.startListening).not.toHaveBeenCalled();
    });
  });
 });

@@ -694,8 +694,7 @@ export type {
 export {
   DEFAULT_MODE_PRESETS,
   resolveVisibilityConfig,
-  getEffectiveLabels,
-  useVoiceVisibility
+  getEffectiveLabels
 };
 
 // Legacy exports (for backward compatibility)

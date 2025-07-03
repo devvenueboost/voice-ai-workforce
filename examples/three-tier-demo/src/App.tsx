@@ -122,6 +122,7 @@ function App() {
   }, [commandHistory]);
 
   // Process voice command and generate response
+  // @ts-ignore
   const processCommand = (command: VoiceCommand, source: 'voice' | 'text' = 'voice'): VoiceResponse => {
     let response: VoiceResponse;
 

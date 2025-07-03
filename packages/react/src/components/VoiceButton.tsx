@@ -10,9 +10,9 @@ import {
   VoiceAIConfig, 
   VoiceAIError, 
   CommandDefinition,
-  useVoiceVisibility,
   VoiceModeProps
 } from '../../../types/src/types';
+import { useVoiceVisibility } from '../hooks/useVoiceVisibility';
  // @ts-ignore
 import { VoiceAIThemeProps, VoiceAIPosition, VoiceAISize, VoiceAIVariant } from '../types/theme';
 import { SIZE_CLASSES, POSITION_CLASSES, ANIMATION_CLASSES } from '../utils/theme';
