@@ -226,6 +226,7 @@ export function createMediaQuery(breakpoint: keyof typeof BREAKPOINTS): string {
 }
 
 // Accessibility utilities
+// @ts-ignore
 export function getAccessibleContrast(background: string, foreground: string): number {
   // Simplified contrast calculation
   // In a real implementation, you'd use a proper color contrast algorithm

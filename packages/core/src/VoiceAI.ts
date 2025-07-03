@@ -17,7 +17,6 @@ import {
   OpenAIConfig,
   AnthropicConfig,
   GoogleConfig,
-  KeywordsConfig
 } from '../../types/src/types';
 
 import { DEFAULT_COMMAND_REGISTRY, findCommandByTrigger, getCommandByIntent } from '../../types/src/commands';

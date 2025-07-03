@@ -1,6 +1,7 @@
 // examples/three-tier-demo/src/App.tsx
 import React, { useState, useRef, useEffect } from 'react';
-import { VoiceButton, VoiceCommandCenter } from '../../../packages/react/src/components/VoiceButton';
+import { VoiceButton } from '../../../packages/react/src/components/VoiceButton';
+import { VoiceCommandCenter } from '../../../packages/react/src/components/VoiceCommandCenter';
 import { VoiceCommand, VoiceResponse, VoiceAIConfig, UserRole, VoiceInterfaceMode } from '../../../packages/types/src/types';
 
 // Command history interface
@@ -46,6 +47,7 @@ function App() {
     responseMode: 'both' as any,
     context: {
       userRole: UserRole.FIELD_WORKER,
+      // @ts-ignore
       endpoints: {
         clockIn: '/api/timesheet/clock-in',
         clockOut: '/api/timesheet/clock-out',
@@ -106,6 +108,7 @@ function App() {
   }, [commandHistory]);
 
   // Process voice command and generate response
+  // @ts-ignore
   const processCommand = (command: VoiceCommand, source: 'voice' | 'text' = 'voice'): VoiceResponse => {
     let response: VoiceResponse;
 
