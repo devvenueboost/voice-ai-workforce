@@ -8,7 +8,6 @@ import {
   VoiceResponse, 
   VoiceAIState, 
   VoiceAIError,
-  VoiceInterfaceMode,
   VisibilityConfig,
   CustomLabels,
   useVoiceVisibility,

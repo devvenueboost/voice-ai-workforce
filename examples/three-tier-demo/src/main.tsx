@@ -1,4 +1,4 @@
-// examples/basic-demo/src/main.tsx
+// examples/three-tier-demo/src/main.tsx
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'

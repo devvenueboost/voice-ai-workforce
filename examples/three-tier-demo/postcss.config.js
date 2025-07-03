@@ -1,4 +1,4 @@
-// examples/basic-demo/postcss.config.js
+// examples/three-tier-demo/postcss.config.js
 export default {
     plugins: {
       tailwindcss: {},

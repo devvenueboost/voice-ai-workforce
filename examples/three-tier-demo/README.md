@@ -63,7 +63,7 @@ npm run preview
 
 ### Project Structure
 ```
-examples/basic-demo/
+examples/three-tier-demo/
 ├── src/
 │   ├── App.tsx          # Main demo application
 │   ├── main.tsx         # React entry point
