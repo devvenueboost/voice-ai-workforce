@@ -2,16 +2,23 @@
 
 import React, { useState, useEffect } from 'react';
 import { useVoiceAI } from '../hooks/useVoiceAI';
-import { useComponentTheme, useVoiceThemeContext } from './VoiceProvider';
-import { VoiceAIConfig, AIProvider } from '../../../types/src/types';
+import { useComponentTheme, useVoiceContext } from './VoiceProvider';
+import { 
+  VoiceAIConfig, 
+  AIProvider,
+  VoiceModeProps,
+  useVoiceVisibility
+} from '../../../types/src/types';
 import { VoiceAIThemeProps } from '../types/theme';
 import { SIZE_CLASSES } from '../utils/theme';
 
-// Props interface
-export interface VoiceSettingsPanelProps extends VoiceAIThemeProps {
+// Props interface with mode support
+export interface VoiceSettingsPanelProps extends VoiceAIThemeProps, VoiceModeProps {
   config: VoiceAIConfig;
   onConfigChange?: (config: Partial<VoiceAIConfig>) => void;
   onClose?: () => void;
+  
+  // Legacy props - now controlled by visibility config
   showAdvanced?: boolean;
   showThemeSettings?: boolean;
   showAudioSettings?: boolean;
@@ -84,23 +91,64 @@ const ResetIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
+const ModeIcon = ({ className }: { className?: string }) => (
+  <svg className={className} fill="currentColor" viewBox="0 0 24 24">
+    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+  </svg>
+);
+
 export const VoiceSettingsPanel: React.FC<VoiceSettingsPanelProps> = ({
   config,
   onConfigChange,
   onClose,
-  showAdvanced = true,
-  showThemeSettings = true,
-  showAudioSettings = true,
-  showProviderSettings = true,
   theme: customTheme,
   size = 'md',
   className = '',
   style,
+  
+  // Legacy props - now controlled by visibility
+  showAdvanced,
+  showThemeSettings,
+  showAudioSettings,
+  showProviderSettings,
+  
+  // NEW: Mode support props
+  mode,
+  visibilityOverrides,
+  customLabels: propCustomLabels,
   ...props
 }) => {
   const theme = useComponentTheme(customTheme);
-  const { updateTheme, resetTheme } = useVoiceThemeContext();
-  const [activeTab, setActiveTab] = useState<'general' | 'audio' | 'providers' | 'theme' | 'advanced'>('general');
+  const { updateTheme, resetTheme, setMode: setContextMode, updateVisibility, updateLabels } = useVoiceContext();
+  
+  // NEW: Resolve visibility and labels based on mode
+  const { visibility, labels } = useVoiceVisibility(config, mode, visibilityOverrides);
+  
+  // Merge prop labels with resolved labels
+  const effectiveLabels = {
+    voiceButton: { ...labels.voiceButton, ...propCustomLabels?.voiceButton },
+    status: { ...labels.status, ...propCustomLabels?.status },
+    providers: { ...labels.providers, ...propCustomLabels?.providers },
+    errors: { ...labels.errors, ...propCustomLabels?.errors }
+  };
+
+  // Determine what tabs to show based on mode and legacy props
+  const shouldShowAdvanced = showAdvanced !== undefined ? showAdvanced : visibility.showAdvancedSettings;
+  const shouldShowTheme = showThemeSettings !== undefined ? showThemeSettings : visibility.showAdvancedSettings;
+  const shouldShowAudio = showAudioSettings !== undefined ? showAudioSettings : visibility.showAdvancedSettings;
+  const shouldShowProvider = showProviderSettings !== undefined ? showProviderSettings : visibility.showProviders;
+
+  // Available tabs based on visibility
+  const availableTabs = [
+    { id: 'general', label: 'General', icon: SettingsIcon, visible: true },
+    { id: 'audio', label: 'Audio', icon: MicrophoneIcon, visible: shouldShowAudio },
+    { id: 'providers', label: 'Providers', icon: CloudIcon, visible: shouldShowProvider },
+    { id: 'theme', label: 'Theme', icon: PaletteIcon, visible: shouldShowTheme },
+    { id: 'mode', label: 'Mode', icon: ModeIcon, visible: visibility.showAdvancedSettings },
+    { id: 'advanced', label: 'Advanced', icon: SettingsIcon, visible: shouldShowAdvanced }
+  ].filter(tab => tab.visible);
+
+  const [activeTab, setActiveTab] = useState<string>(availableTabs[0]?.id || 'general');
 
   // Voice AI state
   const { getState } = useVoiceAI({ config, autoStart: false });
@@ -108,23 +156,21 @@ export const VoiceSettingsPanel: React.FC<VoiceSettingsPanelProps> = ({
 
   // Settings state
   const [settings, setSettings] = useState<SettingsState>({
-    // @ts-ignore
-    preferredProvider: config.aiProviders?.preferred || 'OpenAI',
-    // @ts-ignore
-    fallbackProviders: config.aiProviders?.fallbacks || ['Anthropic', 'Google'],
+    preferredProvider: config.aiProviders?.primary?.provider || AIProvider.OPENAI,
+    fallbackProviders: config.aiProviders?.fallbacks?.map(f => f.provider) || [],
     microphoneGain: 1.0,
     noiseReduction: true,
     echoCancellation: true,
     autoGainControl: true,
-    confidenceThreshold: 0.8,
+    confidenceThreshold: config.confidenceThreshold || 0.8,
     speechTimeout: 5000,
     silenceTimeout: 2000,
-    autoStart: false,
+    autoStart: config.autoListen || false,
     showVisualFeedback: true,
     playAudioFeedback: true,
     logLevel: 'info',
-    retryAttempts: 3,
-    requestTimeout: 10000,
+    retryAttempts: config.aiProviders?.retryAttempts || 3,
+    requestTimeout: config.aiProviders?.timeoutMs || 10000,
   });
 
   // Handle settings change
@@ -137,28 +183,50 @@ export const VoiceSettingsPanel: React.FC<VoiceSettingsPanelProps> = ({
     // Apply changes to config
     const configUpdate: Partial<VoiceAIConfig> = {};
     
-    if (key === 'preferredProvider') {
-      configUpdate.aiProviders = {
-        ...config.aiProviders,
-        // @ts-ignore
-        preferred: value as AIProvider
-      };
+    switch (key) {
+      case 'preferredProvider':
+        if (config.aiProviders) {
+          configUpdate.aiProviders = {
+            ...config.aiProviders,
+            // @ts-ignore
+            primary: { ...config.aiProviders.primary, provider: value as AIProvider }
+          };
+        }
+        break;
+      case 'confidenceThreshold':
+        configUpdate.confidenceThreshold = value as number;
+        break;
+      case 'autoStart':
+        configUpdate.autoListen = value as boolean;
+        break;
+      case 'retryAttempts':
+        if (config.aiProviders) {
+          configUpdate.aiProviders = {
+            ...config.aiProviders,
+            retryAttempts: value as number
+          };
+        }
+        break;
+      case 'requestTimeout':
+        if (config.aiProviders) {
+          configUpdate.aiProviders = {
+            ...config.aiProviders,
+            timeoutMs: value as number
+          };
+        }
+        break;
     }
     
-    if (key === 'confidenceThreshold') {
-      configUpdate.confidenceThreshold = value as number;
+    if (Object.keys(configUpdate).length > 0) {
+      onConfigChange?.(configUpdate);
     }
-    
-    onConfigChange?.(configUpdate);
   };
 
   // Reset all settings
   const handleResetSettings = () => {
     setSettings({
-        // @ts-ignore
-      preferredProvider: 'OpenAI',
-      // @ts-ignore
-      fallbackProviders: ['Anthropic', 'Google'],
+      preferredProvider: AIProvider.OPENAI,
+      fallbackProviders: [],
       microphoneGain: 1.0,
       noiseReduction: true,
       echoCancellation: true,
@@ -179,7 +247,7 @@ export const VoiceSettingsPanel: React.FC<VoiceSettingsPanelProps> = ({
 
   const panelClasses = [
     'bg-white rounded-lg border shadow-lg',
-    SIZE_CLASSES.panel[size],
+    SIZE_CLASSES.panel?.[size] || 'w-96 max-h-96',
     className
   ].filter(Boolean).join(' ');
 
@@ -198,8 +266,8 @@ export const VoiceSettingsPanel: React.FC<VoiceSettingsPanelProps> = ({
       <div className="flex items-center justify-between p-4 border-b" 
            style={{ borderColor: theme.colors.border }}>
         <div className="flex items-center space-x-2">
-        {/* @ts-ignore */}
-          <SettingsIcon className="w-5 h-5" color={theme.colors.text.primary} />
+            {/* @ts-ignore */}
+          <SettingsIcon className="w-5 h-5" style={{ color: theme.colors.text.primary }} />
           <h3 className="text-lg font-semibold" style={{ color: theme.colors.text.primary }}>
             Voice Settings
           </h3>
@@ -228,33 +296,29 @@ export const VoiceSettingsPanel: React.FC<VoiceSettingsPanelProps> = ({
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex border-b overflow-x-auto" style={{ borderColor: theme.colors.border }}>
-        {[
-          { id: 'general' as const, label: 'General', icon: SettingsIcon },
-          ...(showAudioSettings ? [{ id: 'audio' as const, label: 'Audio', icon: MicrophoneIcon }] : []),
-          ...(showProviderSettings ? [{ id: 'providers' as const, label: 'Providers', icon: CloudIcon }] : []),
-          ...(showThemeSettings ? [{ id: 'theme' as const, label: 'Theme', icon: PaletteIcon }] : []),
-          ...(showAdvanced ? [{ id: 'advanced' as const, label: 'Advanced', icon: SettingsIcon }] : [])
-        ].map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center space-x-2 px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors ${
-              activeTab === tab.id
-                ? 'border-b-2'
-                : 'hover:bg-gray-50'
-            }`}
-            style={{
-              color: activeTab === tab.id ? theme.colors.primary : theme.colors.text.secondary,
-              borderBottomColor: activeTab === tab.id ? theme.colors.primary : 'transparent'
-            }}
-          >
-            <tab.icon className="w-4 h-4" />
-            <span>{tab.label}</span>
-          </button>
-        ))}
-      </div>
+      {/* Tabs - only show available tabs */}
+      {availableTabs.length > 1 && (
+        <div className="flex border-b overflow-x-auto" style={{ borderColor: theme.colors.border }}>
+          {availableTabs.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center space-x-2 px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors ${
+                activeTab === tab.id
+                  ? 'border-b-2'
+                  : 'hover:bg-gray-50'
+              }`}
+              style={{
+                color: activeTab === tab.id ? theme.colors.primary : theme.colors.text.secondary,
+                borderBottomColor: activeTab === tab.id ? theme.colors.primary : 'transparent'
+              }}
+            >
+              <tab.icon className="w-4 h-4" />
+              <span>{tab.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Content */}
       <div className="p-4 max-h-96 overflow-y-auto">
@@ -331,7 +395,7 @@ export const VoiceSettingsPanel: React.FC<VoiceSettingsPanelProps> = ({
         )}
 
         {/* Audio Settings */}
-        {activeTab === 'audio' && showAudioSettings && (
+        {activeTab === 'audio' && shouldShowAudio && (
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium mb-2" style={{ color: theme.colors.text.primary }}>
@@ -421,7 +485,7 @@ export const VoiceSettingsPanel: React.FC<VoiceSettingsPanelProps> = ({
         )}
 
         {/* Provider Settings */}
-        {activeTab === 'providers' && showProviderSettings && (
+        {activeTab === 'providers' && shouldShowProvider && (
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium mb-2" style={{ color: theme.colors.text.primary }}>
@@ -436,40 +500,43 @@ export const VoiceSettingsPanel: React.FC<VoiceSettingsPanelProps> = ({
                   borderColor: theme.colors.border
                 }}
               >
-                <option value="OpenAI">OpenAI</option>
-                <option value="Anthropic">Anthropic</option>
-                <option value="Google">Google</option>
-                <option value="Keywords">Keywords Only</option>
+                <option value={AIProvider.OPENAI}>OpenAI</option>
+                <option value={AIProvider.ANTHROPIC}>Anthropic</option>
+                <option value={AIProvider.GOOGLE}>Google</option>
+                <option value={AIProvider.KEYWORDS}>Keywords Only</option>
               </select>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium mb-2" style={{ color: theme.colors.text.primary }}>
-                Provider Status
-              </label>
-              <div className="space-y-2">
-                {Object.entries(state.providerStatus || {}).map(([provider, status]) => (
-                  <div key={provider} className="flex items-center justify-between py-2 px-3 rounded"
-                       style={{ backgroundColor: theme.colors.background }}>
-                    <span className="text-sm capitalize" style={{ color: theme.colors.text.primary }}>
-                      {provider}
-                    </span>
-                    <span 
-                      className={`px-2 py-1 text-xs rounded ${
-                        status === 'available' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                      }`}
-                    >
-                      {status}
-                    </span>
-                  </div>
-                ))}
+            {/* Only show provider status if visibility allows */}
+            {visibility.showProviderStatus && (
+              <div>
+                <label className="block text-sm font-medium mb-2" style={{ color: theme.colors.text.primary }}>
+                  Provider Status
+                </label>
+                <div className="space-y-2">
+                  {Object.entries(state.providerStatus || {}).map(([provider, status]) => (
+                    <div key={provider} className="flex items-center justify-between py-2 px-3 rounded"
+                         style={{ backgroundColor: theme.colors.background }}>
+                      <span className="text-sm capitalize" style={{ color: theme.colors.text.primary }}>
+                        {visibility.showProviders ? provider : effectiveLabels.providers.generic}
+                      </span>
+                      <span 
+                        className={`px-2 py-1 text-xs rounded ${
+                          status === 'available' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                        }`}
+                      >
+                        {status}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )}
 
         {/* Theme Settings */}
-        {activeTab === 'theme' && showThemeSettings && (
+        {activeTab === 'theme' && shouldShowTheme && (
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium mb-2" style={{ color: theme.colors.text.primary }}>
@@ -535,8 +602,59 @@ export const VoiceSettingsPanel: React.FC<VoiceSettingsPanelProps> = ({
           </div>
         )}
 
+        {/* Mode Settings */}
+        {activeTab === 'mode' && visibility.showAdvancedSettings && (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-2" style={{ color: theme.colors.text.primary }}>
+                Interface Mode
+              </label>
+              <div className="space-y-2">
+                {[
+                  { 
+                    id: 'developer', 
+                    label: 'Developer Mode', 
+                    description: 'Shows all technical details and options' 
+                  },
+                  { 
+                    id: 'project', 
+                    label: 'Project Mode', 
+                    description: 'Balanced view for project configuration' 
+                  },
+                  { 
+                    id: 'end-user', 
+                    label: 'End User Mode', 
+                    description: 'Simplified interface for end users' 
+                  }
+                ].map((modeOption) => (
+                  <div key={modeOption.id} className="border rounded p-3" style={{ borderColor: theme.colors.border }}>
+                    <div className="flex items-start space-x-3">
+                      <input
+                        type="radio"
+                        name="interfaceMode"
+                        value={modeOption.id}
+                        checked={mode === modeOption.id}
+                        onChange={() => setContextMode && setContextMode(modeOption.id as any)}
+                        className="mt-1"
+                      />
+                      <div>
+                        <div className="font-medium text-sm" style={{ color: theme.colors.text.primary }}>
+                          {modeOption.label}
+                        </div>
+                        <div className="text-xs" style={{ color: theme.colors.text.secondary }}>
+                          {modeOption.description}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Advanced Settings */}
-        {activeTab === 'advanced' && showAdvanced && (
+        {activeTab === 'advanced' && shouldShowAdvanced && (
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium mb-2" style={{ color: theme.colors.text.primary }}>
@@ -597,18 +715,22 @@ export const VoiceSettingsPanel: React.FC<VoiceSettingsPanelProps> = ({
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium mb-2" style={{ color: theme.colors.text.primary }}>
-                Debug Information
-              </label>
-              <div className="p-3 rounded bg-gray-50 text-xs font-mono"
-                   style={{ backgroundColor: theme.colors.background }}>
-                <div>Active Provider: {state.activeProvider || 'None'}</div>
-                <div>Available Providers: {Object.keys(state.providerStatus || {}).join(', ')}</div>
-                <div>Commands Available: {config.commands?.registry?.commands?.length || 0}</div>
-                <div>Theme: {theme.colors.primary}</div>
+            {/* Debug information - only show if visibility allows */}
+            {visibility.showDebugInfo && (
+              <div>
+                <label className="block text-sm font-medium mb-2" style={{ color: theme.colors.text.primary }}>
+                  Debug Information
+                </label>
+                <div className="p-3 rounded bg-gray-50 text-xs font-mono"
+                     style={{ backgroundColor: theme.colors.background }}>
+                  <div>Active Provider: {state.activeProvider || 'None'}</div>
+                  <div>Available Providers: {Object.keys(state.providerStatus || {}).join(', ')}</div>
+                  <div>Commands Available: {config.commands?.registry?.commands?.length || 0}</div>
+                  <div>Current Mode: {mode || config.interfaceMode || 'project'}</div>
+                  <div>Theme: {theme.colors.primary}</div>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )}
       </div>

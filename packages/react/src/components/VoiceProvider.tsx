@@ -1,7 +1,13 @@
 // packages/react/src/components/VoiceProvider.tsx
 
 import React, { createContext, useContext, useMemo } from 'react';
-import { VoiceAIConfig } from '../../../types/src/types';
+import { 
+  VoiceAIConfig, 
+  VoiceInterfaceMode, 
+  VisibilityConfig, 
+  CustomLabels,
+  useVoiceVisibility
+} from '../../../types/src/types';
 import { VoiceAITheme, VoiceAIThemeProps } from '../types/theme';
 
 // Default theme
@@ -73,20 +79,34 @@ const defaultTheme: VoiceAITheme = {
   }
 };
 
-// Theme context
-interface VoiceThemeContextValue {
+// Combined context interface
+interface VoiceContextValue {
+  // Theme context
   theme: VoiceAITheme;
   updateTheme: (newTheme: Partial<VoiceAITheme>) => void;
   resetTheme: () => void;
+  
+  // Voice configuration context
+  config?: VoiceAIConfig;
+  mode?: VoiceInterfaceMode;
+  visibility: VisibilityConfig;
+  labels: CustomLabels;
+  updateConfig: (newConfig: Partial<VoiceAIConfig>) => void;
+  setMode: (mode: VoiceInterfaceMode) => void;
+  updateVisibility: (visibility: Partial<VisibilityConfig>) => void;
+  updateLabels: (labels: Partial<CustomLabels>) => void;
 }
 
-const VoiceThemeContext = createContext<VoiceThemeContextValue | null>(null);
+const VoiceContext = createContext<VoiceContextValue | null>(null);
 
 // Provider props
 export interface VoiceProviderProps {
   children: React.ReactNode;
   theme?: Partial<VoiceAITheme>;
   config?: VoiceAIConfig;
+  mode?: VoiceInterfaceMode;
+  visibilityOverrides?: Partial<VisibilityConfig>;
+  customLabels?: Partial<CustomLabels>;
 }
 
 // Deep merge helper
@@ -119,14 +139,39 @@ function deepMerge<T extends Record<string, any>>(target: T, source: Partial<T>)
 export const VoiceProvider: React.FC<VoiceProviderProps> = ({
   children,
   theme: initialTheme,
-  config
+  config,
+  mode: initialMode,
+  visibilityOverrides,
+  customLabels: initialCustomLabels
 }) => {
+  // Theme state
   const [customTheme, setCustomTheme] = React.useState<Partial<VoiceAITheme>>(initialTheme || {});
+  
+  // Voice configuration state
+  const [voiceConfig, setVoiceConfig] = React.useState<VoiceAIConfig | undefined>(config);
+  const [currentMode, setCurrentMode] = React.useState<VoiceInterfaceMode | undefined>(initialMode);
+  const [visibilityConfig, setVisibilityConfig] = React.useState<Partial<VisibilityConfig>>(visibilityOverrides || {});
+  const [labelsConfig, setLabelsConfig] = React.useState<Partial<CustomLabels>>(initialCustomLabels || {});
 
   // Merge default theme with custom theme
   const mergedTheme = useMemo(() => {
     return deepMerge(defaultTheme, customTheme);
   }, [customTheme]);
+
+  // Resolve visibility and labels based on current config and mode
+  const { visibility, labels } = useVoiceVisibility(
+    voiceConfig || config,
+    currentMode,
+    visibilityConfig
+  );
+
+  // Merge provider labels with resolved labels
+  const effectiveLabels = useMemo(() => ({
+    voiceButton: { ...labels.voiceButton, ...labelsConfig.voiceButton },
+    status: { ...labels.status, ...labelsConfig.status },
+    providers: { ...labels.providers, ...labelsConfig.providers },
+    errors: { ...labels.errors, ...labelsConfig.errors }
+  }), [labels, labelsConfig]);
 
   // Theme management functions
   const updateTheme = React.useCallback((newTheme: Partial<VoiceAITheme>) => {
@@ -137,31 +182,82 @@ export const VoiceProvider: React.FC<VoiceProviderProps> = ({
     setCustomTheme(initialTheme || {});
   }, [initialTheme]);
 
+  // Voice configuration management functions
+  const updateConfig = React.useCallback((newConfig: Partial<VoiceAIConfig>) => {
+    setVoiceConfig(prev => prev ? { ...prev, ...newConfig } : newConfig as VoiceAIConfig);
+  }, []);
+
+  const setMode = React.useCallback((mode: VoiceInterfaceMode) => {
+    setCurrentMode(mode);
+  }, []);
+
+  const updateVisibility = React.useCallback((newVisibility: Partial<VisibilityConfig>) => {
+    setVisibilityConfig(prev => ({ ...prev, ...newVisibility }));
+  }, []);
+
+  const updateLabels = React.useCallback((newLabels: Partial<CustomLabels>) => {
+    setLabelsConfig(prev => ({ ...prev, ...newLabels }));
+  }, []);
+
   const contextValue = useMemo(() => ({
+    // Theme context
     theme: mergedTheme,
     updateTheme,
-    resetTheme
-  }), [mergedTheme, updateTheme, resetTheme]);
+    resetTheme,
+    
+    // Voice configuration context
+    config: voiceConfig || config,
+    mode: currentMode,
+    visibility,
+    labels: effectiveLabels,
+    updateConfig,
+    setMode,
+    updateVisibility,
+    updateLabels
+  }), [
+    mergedTheme, 
+    updateTheme, 
+    resetTheme,
+    voiceConfig,
+    config,
+    currentMode,
+    visibility,
+    effectiveLabels,
+    updateConfig,
+    setMode,
+    updateVisibility,
+    updateLabels
+  ]);
 
   return (
-    <VoiceThemeContext.Provider value={contextValue}>
+    <VoiceContext.Provider value={contextValue}>
       {children}
-    </VoiceThemeContext.Provider>
+    </VoiceContext.Provider>
   );
 };
 
-// Hook to use theme context
-export const useVoiceThemeContext = (): VoiceThemeContextValue => {
-  const context = useContext(VoiceThemeContext);
+// Hook to use the combined context
+export const useVoiceContext = (): VoiceContextValue => {
+  const context = useContext(VoiceContext);
   if (!context) {
-    throw new Error('useVoiceThemeContext must be used within a VoiceProvider');
+    throw new Error('useVoiceContext must be used within a VoiceProvider');
   }
   return context;
 };
 
+// Legacy hook for theme-only usage (backward compatibility)
+export const useVoiceThemeContext = () => {
+  const context = useVoiceContext();
+  return {
+    theme: context.theme,
+    updateTheme: context.updateTheme,
+    resetTheme: context.resetTheme
+  };
+};
+
 // Hook to get component theme (merges context + component-level theme)
 export const useComponentTheme = (componentTheme?: Partial<VoiceAITheme>): VoiceAITheme => {
-  const { theme: contextTheme } = useVoiceThemeContext();
+  const { theme: contextTheme } = useVoiceContext();
   
   return useMemo(() => {
     if (!componentTheme) return contextTheme;

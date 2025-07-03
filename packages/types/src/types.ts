@@ -11,6 +11,8 @@ export enum AIProvider {
   KEYWORDS = 'keywords' // Fallback
 }
 
+export type VoiceInterfaceMode = 'developer' | 'project' | 'end-user';
+
 export interface OpenAIConfig {
   provider: AIProvider.OPENAI;
   apiKey: string;
@@ -154,7 +156,6 @@ export interface VoiceAIConfig {
   apiBaseUrl?: string;
   apiKey?: string; // Default API key
   
-  // AI Provider configuration
   aiProviders: {
     primary: AIProviderConfig;
     fallbacks?: AIProviderConfig[];
@@ -206,6 +207,10 @@ export interface VoiceAIConfig {
     enableOfflineMode?: boolean;
     debugMode?: boolean;
   };
+   
+  // NEW: Interface mode configuration
+  interfaceMode?: VoiceInterfaceMode;
+  visibility?: VisibilityConfig;
 }
 
 // =====================================
@@ -348,9 +353,262 @@ export interface WorkforceConfig {
 }
 
 // =====================================
+// MODE SYSTEM TYPES
+// =====================================
+
+// New visibility configuration interface
+export interface VisibilityConfig {
+  // Provider-related visibility
+  showProviders?: boolean;
+  showProviderStatus?: boolean;
+  showProviderErrors?: boolean;
+  
+  // Debug and technical information
+  showDebugInfo?: boolean;
+  showConfidenceScores?: boolean;
+  showProcessingTimes?: boolean;
+  showTechnicalErrors?: boolean;
+  
+  // Advanced features
+  showAdvancedSettings?: boolean;
+  showCommandHistory?: boolean;
+  showAnalytics?: boolean;
+  showExportOptions?: boolean;
+  
+  // User interface complexity
+  showMiniCenter?: boolean;
+  showSettingsPanel?: boolean;
+  showHistoryPanel?: boolean;
+  showStatusIndicator?: boolean;
+  
+  // Labeling and terminology
+  useGenericLabels?: boolean;
+  customLabels?: CustomLabels;
+}
+
+// Custom labeling system
+export interface CustomLabels {
+  voiceButton?: {
+    startText?: string;
+    stopText?: string;
+    processingText?: string;
+    errorText?: string;
+  };
+  status?: {
+    online?: string;
+    offline?: string;
+    listening?: string;
+    processing?: string;
+    error?: string;
+  };
+  providers?: {
+    generic?: string; // e.g., "Voice AI" instead of "OpenAI"
+    fallback?: string; // e.g., "Backup System" instead of "Keywords"
+  };
+  errors?: {
+    generic?: string;
+    connection?: string;
+    permission?: string;
+  };
+}
+
+// Mode presets for quick configuration
+export interface ModePresets {
+  developer: VisibilityConfig;
+  project: VisibilityConfig;
+  'end-user': VisibilityConfig;
+}
+
+// Default mode presets
+export const DEFAULT_MODE_PRESETS: ModePresets = {
+  developer: {
+    // Show everything for developers
+    showProviders: true,
+    showProviderStatus: true,
+    showProviderErrors: true,
+    showDebugInfo: true,
+    showConfidenceScores: true,
+    showProcessingTimes: true,
+    showTechnicalErrors: true,
+    showAdvancedSettings: true,
+    showCommandHistory: true,
+    showAnalytics: true,
+    showExportOptions: true,
+    showMiniCenter: true,
+    showSettingsPanel: true,
+    showHistoryPanel: true,
+    showStatusIndicator: true,
+    useGenericLabels: false,
+  },
+  
+  project: {
+    // Balanced view for projects to configure
+    showProviders: true,
+    showProviderStatus: true,
+    showProviderErrors: false, // Hide detailed errors
+    showDebugInfo: false,
+    showConfidenceScores: true,
+    showProcessingTimes: false,
+    showTechnicalErrors: false,
+    showAdvancedSettings: true,
+    showCommandHistory: true,
+    showAnalytics: true,
+    showExportOptions: true,
+    showMiniCenter: true,
+    showSettingsPanel: true,
+    showHistoryPanel: true,
+    showStatusIndicator: true,
+    useGenericLabels: false,
+  },
+  
+  'end-user': {
+    // Minimal, clean interface for end users
+    showProviders: false,
+    showProviderStatus: false,
+    showProviderErrors: false,
+    showDebugInfo: false,
+    showConfidenceScores: false,
+    showProcessingTimes: false,
+    showTechnicalErrors: false,
+    showAdvancedSettings: false,
+    showCommandHistory: true, // Keep command history as it's useful
+    showAnalytics: false,
+    showExportOptions: false,
+    showMiniCenter: true, // Keep but simplified
+    showSettingsPanel: false,
+    showHistoryPanel: false,
+    showStatusIndicator: true, // Keep status but simplified
+    useGenericLabels: true,
+    customLabels: {
+      voiceButton: {
+        startText: 'Start Voice',
+        stopText: 'Stop Voice',
+        processingText: 'Processing...',
+        errorText: 'Voice Unavailable'
+      },
+      status: {
+        online: 'Voice Ready',
+        offline: 'Voice Unavailable',
+        listening: 'Listening...',
+        processing: 'Processing...',
+        error: 'Voice Error'
+      },
+      providers: {
+        generic: 'Voice Assistant',
+        fallback: 'Voice Assistant'
+      },
+      errors: {
+        generic: 'Voice assistant is temporarily unavailable',
+        connection: 'Please check your connection',
+        permission: 'Microphone permission required'
+      }
+    }
+  }
+};
+
+// Enhanced component props that support mode override
+export interface VoiceModeProps {
+  /**
+   * Interface mode - overrides global config mode
+   */
+  mode?: VoiceInterfaceMode;
+  
+  /**
+   * Visibility overrides - individual flags can override mode presets
+   */
+  visibilityOverrides?: Partial<VisibilityConfig>;
+  
+  /**
+   * Custom labels override
+   */
+  customLabels?: Partial<CustomLabels>;
+}
+
+// Utility function to resolve final visibility config
+export function resolveVisibilityConfig(
+  globalMode?: VoiceInterfaceMode,
+  componentMode?: VoiceInterfaceMode,
+  globalVisibility?: VisibilityConfig,
+  componentOverrides?: Partial<VisibilityConfig>
+): VisibilityConfig {
+  // Determine effective mode (component overrides global)
+  const effectiveMode = componentMode || globalMode || 'project';
+  
+  // Start with mode preset
+  const modePreset = DEFAULT_MODE_PRESETS[effectiveMode];
+  
+  // Apply global visibility config
+  const withGlobalConfig = { ...modePreset, ...globalVisibility };
+  
+  // Apply component-level overrides
+  const finalConfig = { ...withGlobalConfig, ...componentOverrides };
+  
+  return finalConfig;
+}
+
+// Utility function to get labels based on config
+export function getEffectiveLabels(
+  visibility: VisibilityConfig,
+  customLabels?: Partial<CustomLabels>
+): CustomLabels {
+  const baseLabels = visibility.useGenericLabels 
+    ? DEFAULT_MODE_PRESETS['end-user'].customLabels!
+    : {
+        voiceButton: {
+          startText: 'Start Listening',
+          stopText: 'Stop Listening',
+          processingText: 'Processing voice...',
+          errorText: 'Voice error'
+        },
+        status: {
+          online: 'Online',
+          offline: 'Offline',
+          listening: 'Listening',
+          processing: 'Processing',
+          error: 'Error'
+        },
+        providers: {
+          generic: 'AI Provider',
+          fallback: 'Keywords'
+        },
+        errors: {
+          generic: 'An error occurred',
+          connection: 'Connection failed',
+          permission: 'Permission denied'
+        }
+      };
+
+  // Merge with custom labels
+  return {
+    voiceButton: { ...baseLabels.voiceButton, ...customLabels?.voiceButton },
+    status: { ...baseLabels.status, ...customLabels?.status },
+    providers: { ...baseLabels.providers, ...customLabels?.providers },
+    errors: { ...baseLabels.errors, ...customLabels?.errors }
+  };
+}
+
+// Hook for components to get their effective configuration
+export function useVoiceVisibility(
+  config: VoiceAIConfig,
+  componentMode?: VoiceInterfaceMode,
+  componentOverrides?: Partial<VisibilityConfig>
+) {
+  const visibility = resolveVisibilityConfig(
+    config.interfaceMode,
+    componentMode,
+    config.visibility,
+    componentOverrides
+  );
+  
+  const labels = getEffectiveLabels(visibility, config.visibility?.customLabels);
+  
+  return { visibility, labels };
+}
+
+// =====================================
 // EXPORTS
 // =====================================
-  // @ts-ignore
+// @ts-ignore
 export * from './commands'; // We'll create this file for default commands
-  // @ts-ignore
+// @ts-ignore
 export * from './presets';  // We'll create this file for role presets

@@ -1,17 +1,32 @@
-// packages/react/src/components/VoiceCommandCenter.tsx
+// packages/react/src/components/VoiceCommandCenter.tsx - Updated with Mode Support
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useVoiceAI } from '../hooks/useVoiceAI';
 import {
-  VoiceCommandCenterProps,
-  VoiceCommand,
-  VoiceResponse,
-  CommandDefinition,
-  CommandCategory,
-  AIProvider
-} from '../../../types/src/types';
+    VoiceCommand,
+    VoiceResponse,
+    VoiceAIConfig,
+    VoiceAIError,
+    CommandDefinition,
+    useVoiceVisibility,
+    VoiceModeProps
+  } from '../../../types/src/types';
 
-// Icons (using simple SVG for now)
+// Enhanced props interface with mode support
+export interface VoiceCommandCenterPropsWithMode extends VoiceModeProps {
+  config: VoiceAIConfig;
+  isOpen: boolean;
+  onClose?: () => void;
+  position?: 'left' | 'right';
+  width?: number;
+  showCategories?: boolean;
+  showHistory?: boolean;
+  onCommand?: (command: VoiceCommand) => void;
+  onResponse?: (response: VoiceResponse) => void;
+  onError?: (error: VoiceAIError) => void;
+}
+
+// Icons (keeping existing ones)
 const MicIcon = ({ className }: { className?: string }) => (
   <svg className={className} fill="currentColor" viewBox="0 0 24 24">
     <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
@@ -44,7 +59,13 @@ const PlayIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
-export const VoiceCommandCenter: React.FC<VoiceCommandCenterProps> = ({
+const SettingsIcon = ({ className }: { className?: string }) => (
+  <svg className={className} fill="currentColor" viewBox="0 0 24 24">
+    <path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.82,11.69,4.82,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.43-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/>
+  </svg>
+);
+
+export const VoiceCommandCenter: React.FC<VoiceCommandCenterPropsWithMode> = ({
   config,
   isOpen,
   onClose,
@@ -54,9 +75,34 @@ export const VoiceCommandCenter: React.FC<VoiceCommandCenterProps> = ({
   showHistory = true,
   onCommand,
   onResponse,
-  onError
+  onError,
+  
+  // NEW: Mode support props
+  mode,
+  visibilityOverrides,
+  customLabels: propCustomLabels
 }) => {
-  const [activeTab, setActiveTab] = useState<'commands' | 'history' | 'settings'>('commands');
+  // NEW: Resolve visibility and labels based on mode
+  const { visibility, labels } = useVoiceVisibility(config, mode, visibilityOverrides);
+  
+  // Merge prop labels with resolved labels
+  const effectiveLabels = {
+    voiceButton: { ...labels.voiceButton, ...propCustomLabels?.voiceButton },
+    status: { ...labels.status, ...propCustomLabels?.status },
+    providers: { ...labels.providers, ...propCustomLabels?.providers },
+    errors: { ...labels.errors, ...propCustomLabels?.errors }
+  };
+
+  // Determine which tabs to show based on visibility
+  const availableTabs = [
+    { id: 'commands', label: 'Commands', icon: MicIcon, visible: true },
+    { id: 'history', label: 'History', icon: HistoryIcon, visible: visibility.showCommandHistory && showHistory },
+    { id: 'settings', label: 'Settings', icon: SettingsIcon, visible: visibility.showAdvancedSettings }
+  ].filter(tab => tab.visible);
+
+  const [activeTab, setActiveTab] = useState<'commands' | 'history' | 'settings'>(
+    availableTabs[0]?.id as any || 'commands'
+  );
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
@@ -77,12 +123,23 @@ export const VoiceCommandCenter: React.FC<VoiceCommandCenterProps> = ({
     config,
     onCommand,
     onResponse,
-    onError,
+    onError: (error) => {
+      // Filter error based on visibility settings
+      let filteredError = error;
+      if (!visibility.showTechnicalErrors) {
+        filteredError = {
+          ...error,
+          message: effectiveLabels.errors.generic || 'An error occurred',
+          details: undefined
+        };
+      }
+      onError?.(filteredError);
+    },
     autoStart: false
   });
 
   const state = getState();
-  const commandHistory = state.commandHistory || [];
+  const commandHistory = visibility.showCommandHistory ? (state.commandHistory || []) : [];
   const suggestedCommands = state.suggestedCommands || [];
   
   // Get available commands and categories
@@ -164,7 +221,7 @@ export const VoiceCommandCenter: React.FC<VoiceCommandCenterProps> = ({
           {!isMinimized && (
             <>
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Voice Commands
+                {effectiveLabels.providers.generic || 'Voice Commands'}
               </h2>
               <div className="flex items-center space-x-2">
                 <button
@@ -210,19 +267,30 @@ export const VoiceCommandCenter: React.FC<VoiceCommandCenterProps> = ({
             >
               <MicIcon className="w-5 h-5" />
               <span>
-                {isProcessing ? 'Processing...' : isListening ? 'Stop Listening' : 'Start Listening'}
+                {isProcessing 
+                  ? (effectiveLabels.voiceButton.processingText || 'Processing...') 
+                  : isListening 
+                    ? (effectiveLabels.voiceButton.stopText || 'Stop Listening') 
+                    : (effectiveLabels.voiceButton.startText || 'Start Listening')
+                }
               </span>
             </button>
             
             {error && (
               <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-700 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400">
-                {error}
+                {visibility.showTechnicalErrors ? error : effectiveLabels.errors.generic}
               </div>
             )}
 
-            {state.activeProvider && (
+            {/* Provider status - only show if visibility allows */}
+            {visibility.showProviderStatus && state.activeProvider && (
               <div className="mt-2 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-                <span>Provider: {state.activeProvider}</span>
+                <span>
+                  {visibility.showProviders 
+                    ? `Provider: ${state.activeProvider}`
+                    : effectiveLabels.providers.generic
+                  }
+                </span>
                 {state.providerStatus && (
                   <span className={[
                     'px-2 py-1 rounded',
@@ -237,28 +305,26 @@ export const VoiceCommandCenter: React.FC<VoiceCommandCenterProps> = ({
             )}
           </div>
 
-          {/* Tabs */}
-          <div className="flex border-b border-gray-200 dark:border-gray-700">
-            {[
-              { id: 'commands', label: 'Commands', icon: MicIcon },
-              { id: 'history', label: 'History', icon: HistoryIcon },
-              { id: 'settings', label: 'Settings', icon: CloseIcon }
-            ].map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={[
-                  'flex-1 flex items-center justify-center space-x-1 py-3 text-sm font-medium transition-colors',
-                  activeTab === tab.id
-                    ? 'text-blue-600 border-b-2 border-blue-600 dark:text-blue-400'
-                    : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
-                ].join(' ')}
-              >
-                <tab.icon className="w-4 h-4" />
-                <span className="hidden sm:inline">{tab.label}</span>
-              </button>
-            ))}
-          </div>
+          {/* Tabs - only show available tabs */}
+          {availableTabs.length > 1 && (
+            <div className="flex border-b border-gray-200 dark:border-gray-700">
+              {availableTabs.map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as any)}
+                  className={[
+                    'flex-1 flex items-center justify-center space-x-1 py-3 text-sm font-medium transition-colors',
+                    activeTab === tab.id
+                      ? 'text-blue-600 border-b-2 border-blue-600 dark:text-blue-400'
+                      : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                  ].join(' ')}
+                >
+                  <tab.icon className="w-4 h-4" />
+                  <span className="hidden sm:inline">{tab.label}</span>
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Content */}
           <div className="flex-1 overflow-hidden">
@@ -275,8 +341,8 @@ export const VoiceCommandCenter: React.FC<VoiceCommandCenterProps> = ({
                   />
                 </div>
 
-                {/* Categories */}
-                {showCategories && (
+                {/* Categories - only show if visibility allows */}
+                {visibility.showAdvancedSettings && showCategories && (
                   <div className="px-3 pb-2">
                     <div className="flex flex-wrap gap-1">
                       <button
@@ -310,7 +376,8 @@ export const VoiceCommandCenter: React.FC<VoiceCommandCenterProps> = ({
 
                 {/* Commands List */}
                 <div className="flex-1 overflow-y-auto">
-                  {showCategories ? (
+                  {/* Show grouped by category if enabled, otherwise flat list */}
+                  {visibility.showAdvancedSettings && showCategories ? (
                     // Grouped by category
                     availableCategories
                       .filter(category => 
@@ -350,6 +417,7 @@ export const VoiceCommandCenter: React.FC<VoiceCommandCenterProps> = ({
                                     key={command.id}
                                     command={command}
                                     onClick={() => handleCommandClick(command)}
+                                    showConfidence={visibility.showConfidenceScores}
                                   />
                                 ))}
                               </div>
@@ -365,6 +433,7 @@ export const VoiceCommandCenter: React.FC<VoiceCommandCenterProps> = ({
                           key={command.id}
                           command={command}
                           onClick={() => handleCommandClick(command)}
+                          showConfidence={visibility.showConfidenceScores}
                         />
                       ))}
                     </div>
@@ -379,7 +448,7 @@ export const VoiceCommandCenter: React.FC<VoiceCommandCenterProps> = ({
               </div>
             )}
 
-            {activeTab === 'history' && showHistory && (
+            {activeTab === 'history' && visibility.showCommandHistory && showHistory && (
               <div className="h-full overflow-y-auto p-3">
                 <div className="space-y-2">
                   {commandHistory.slice(0, 20).map((command, index) => (
@@ -399,16 +468,19 @@ export const VoiceCommandCenter: React.FC<VoiceCommandCenterProps> = ({
                         "{command.rawText}"
                       </div>
                       <div className="flex items-center justify-between">
-                        <span className={[
-                          'text-xs px-2 py-1 rounded',
-                          command.confidence > 0.8 
-                            ? 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400'
-                            : command.confidence > 0.6
-                            ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-400'
-                            : 'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400'
-                        ].join(' ')}>
-                          {Math.round(command.confidence * 100)}% confidence
-                        </span>
+                        {/* Only show confidence if visibility allows */}
+                        {visibility.showConfidenceScores && (
+                          <span className={[
+                            'text-xs px-2 py-1 rounded',
+                            command.confidence > 0.8 
+                              ? 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400'
+                              : command.confidence > 0.6
+                              ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-400'
+                              : 'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400'
+                          ].join(' ')}>
+                            {Math.round(command.confidence * 100)}% confidence
+                          </span>
+                        )}
                         <button
                           onClick={() => processText(command.rawText)}
                           className="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 flex items-center space-x-1"
@@ -429,35 +501,40 @@ export const VoiceCommandCenter: React.FC<VoiceCommandCenterProps> = ({
               </div>
             )}
 
-            {activeTab === 'settings' && (
+            {activeTab === 'settings' && visibility.showAdvancedSettings && (
               <div className="p-4 space-y-4">
-                <div>
-                  <h3 className="font-medium text-gray-900 dark:text-white mb-2">AI Providers</h3>
-                  <div className="space-y-2">
-                    {Object.entries(state.providerStatus || {}).map(([provider, status]) => (
-                      <div key={provider} className="flex items-center justify-between">
-                        <span className="text-sm text-gray-600 dark:text-gray-300 capitalize">
-                          {provider}
-                        </span>
-                        <span className={[
-                          'text-xs px-2 py-1 rounded',
-                          status === 'available' 
-                            ? 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400'
-                            : 'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400'
-                        ].join(' ')}>
-                          {status}
-                        </span>
-                      </div>
-                    ))}
+                {/* Provider info - only show if visibility allows */}
+                {visibility.showProviders && (
+                  <div>
+                    <h3 className="font-medium text-gray-900 dark:text-white mb-2">AI Providers</h3>
+                    <div className="space-y-2">
+                      {Object.entries(state.providerStatus || {}).map(([provider, status]) => (
+                        <div key={provider} className="flex items-center justify-between">
+                          <span className="text-sm text-gray-600 dark:text-gray-300 capitalize">
+                            {provider}
+                          </span>
+                          <span className={[
+                            'text-xs px-2 py-1 rounded',
+                            status === 'available' 
+                              ? 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400'
+                              : 'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400'
+                          ].join(' ')}>
+                            {status}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
                 
                 <div>
                   <h3 className="font-medium text-gray-900 dark:text-white mb-2">Statistics</h3>
                   <div className="space-y-1 text-sm text-gray-600 dark:text-gray-300">
                     <div>Commands available: {availableCommands.length}</div>
                     <div>Categories: {availableCategories.length}</div>
-                    <div>History: {commandHistory.length} commands</div>
+                    {visibility.showCommandHistory && (
+                      <div>History: {commandHistory.length} commands</div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -469,11 +546,12 @@ export const VoiceCommandCenter: React.FC<VoiceCommandCenterProps> = ({
   );
 };
 
-// Command Item Component
+// Command Item Component - updated with visibility support
 const CommandItem: React.FC<{
   command: CommandDefinition;
   onClick: () => void;
-}> = ({ command, onClick }) => {
+  showConfidence?: boolean;
+}> = ({ command, onClick, showConfidence = false }) => {
   return (
     <button
       onClick={onClick}
