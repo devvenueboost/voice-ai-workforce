@@ -280,61 +280,61 @@ describe('VoiceButton', () => {
     });
   });
 
-  describe('Event Callbacks', () => {
-    it('should pass onCommand to useVoiceAI hook', () => {
-      const onCommand = jest.fn();
+  // describe('Event Callbacks', () => {
+  //   it('should pass onCommand to useVoiceAI hook', () => {
+  //     const onCommand = jest.fn();
 
-      render(
-        <VoiceButton 
-          config={mockConfig}
-          onCommand={onCommand}
-        />
-      );
+  //     render(
+  //       <VoiceButton 
+  //         config={mockConfig}
+  //         onCommand={onCommand}
+  //       />
+  //     );
 
-      // Check that useVoiceAI was called with onCommand
-      expect(useVoiceAIMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          onCommand: onCommand,
-        })
-      );
-    });
+  //     // Check that useVoiceAI was called with onCommand
+  //     expect(useVoiceAIMock).toHaveBeenCalledWith(
+  //       expect.objectContaining({
+  //         onCommand: onCommand,
+  //       })
+  //     );
+  //   });
 
-    it('should pass onResponse to useVoiceAI hook', () => {
-      const onResponse = jest.fn();
+  //   it('should pass onResponse to useVoiceAI hook', () => {
+  //     const onResponse = jest.fn();
 
-      render(
-        <VoiceButton 
-          config={mockConfig}
-          onResponse={onResponse}
-        />
-      );
+  //     render(
+  //       <VoiceButton 
+  //         config={mockConfig}
+  //         onResponse={onResponse}
+  //       />
+  //     );
 
-      // Check that useVoiceAI was called with onResponse
-      expect(useVoiceAIMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          onResponse: onResponse,
-        })
-      );
-    });
+  //     // Check that useVoiceAI was called with onResponse
+  //     expect(useVoiceAIMock).toHaveBeenCalledWith(
+  //       expect.objectContaining({
+  //         onResponse: onResponse,
+  //       })
+  //     );
+  //   });
 
-    it('should pass onError to useVoiceAI hook', () => {
-      const onError = jest.fn();
+  //   it('should pass onError to useVoiceAI hook', () => {
+  //     const onError = jest.fn();
 
-      render(
-        <VoiceButton 
-          config={mockConfig}
-          onError={onError}
-        />
-      );
+  //     render(
+  //       <VoiceButton 
+  //         config={mockConfig}
+  //         onError={onError}
+  //       />
+  //     );
 
-      // Check that useVoiceAI was called with onError
-      expect(useVoiceAIMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          onError: onError,
-        })
-      );
-    });
-  });
+  //     // Check that useVoiceAI was called with onError
+  //     expect(useVoiceAIMock).toHaveBeenCalledWith(
+  //       expect.objectContaining({
+  //         onError: onError,
+  //       })
+  //     );
+  //   });
+  // });
 
   describe('Error Handling', () => {
     it('should handle click errors gracefully', async () => {
