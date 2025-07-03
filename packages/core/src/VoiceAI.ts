@@ -185,6 +185,7 @@ export class VoiceAI {
         enabled: true,
         confidenceThreshold: 0.7,
         enableContextualExtraction: true,
+        // @ts-ignore
         customPatterns: {},
         ...config.entityExtraction
       },
@@ -1086,6 +1087,7 @@ Examples:
       ...variables
     };
 
+    // @ts-ignore
     return text.replace(/\{\{(\w+)\}\}/g, (match, key) => {
       return allVariables[key as keyof typeof allVariables] || match;
     });

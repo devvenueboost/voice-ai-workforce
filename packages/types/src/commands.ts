@@ -1,6 +1,6 @@
 // packages/types/src/commands.ts
 
-import { CommandDefinition, CommandCategory, HTTPMethod } from './types';
+import { CommandDefinition, CommandCategory, HTTPMethod, CommandComplexity } from './types';
 
 // =====================================
 // ENHANCED COMMAND CATEGORIES
@@ -69,7 +69,7 @@ export const DEFAULT_COMMANDS: CommandDefinition[] = [
     triggers: ['help', 'what can you do', 'commands', 'assistance', 'voice help'],
     intent: 'help',
     category: 'help',
-    complexity: 'simple',
+    complexity: CommandComplexity.SIMPLE,
     requiresBusinessData: false,
     description: 'Get comprehensive help and available commands',
     examples: ['Help me', 'What can you do?', 'Show me voice commands'],
@@ -93,7 +93,7 @@ export const DEFAULT_COMMANDS: CommandDefinition[] = [
     triggers: ['clock in', 'start work', 'begin shift', 'clock me in', 'start my day', 'punch in'],
     intent: 'clock_in',
     category: 'timesheet',
-    complexity: 'business',
+    complexity: CommandComplexity.BUSINESS,
     requiresBusinessData: true,
     description: 'Clock in with location and project detection',
     examples: ['Clock me in', 'Start work', 'Begin my shift'],
@@ -123,7 +123,7 @@ export const DEFAULT_COMMANDS: CommandDefinition[] = [
     triggers: ['clock out', 'end work', 'finish shift', 'clock me out', 'end my day', 'punch out'],
     intent: 'clock_out',
     category: 'timesheet',
-    complexity: 'business',
+    complexity: CommandComplexity.BUSINESS,
     requiresBusinessData: true,
     description: 'Clock out with automatic day summary',
     examples: ['Clock me out', 'End work', 'Finish my shift'],
@@ -152,7 +152,7 @@ export const DEFAULT_COMMANDS: CommandDefinition[] = [
     triggers: ['generate timesheet', 'create timesheet', 'show my timesheet', 'timesheet report'],
     intent: 'generate_timesheet',
     category: 'timesheet',
-    complexity: 'business',
+    complexity: CommandComplexity.BUSINESS,
     requiresBusinessData: true,
     description: 'Generate comprehensive timesheet report',
     examples: ['Generate my timesheet', 'Show timesheet for this week', 'Create timesheet report'],
@@ -182,7 +182,7 @@ export const DEFAULT_COMMANDS: CommandDefinition[] = [
     triggers: ['get my tasks', 'show tasks', 'what are my tasks', 'task list', 'list my tasks', 'show my work'],
     intent: 'get_tasks',
     category: 'tasks',
-    complexity: 'business',
+    complexity: CommandComplexity.BUSINESS,
     requiresBusinessData: true,
     description: 'Get intelligent task list with priorities and deadlines',
     examples: ['Show my tasks', 'What are my tasks today?', 'List my work'],
@@ -211,7 +211,7 @@ export const DEFAULT_COMMANDS: CommandDefinition[] = [
     triggers: ['complete task', 'finish task', 'done task', 'mark task complete', 'task done'],
     intent: 'complete_task_number',
     category: 'tasks',
-    complexity: 'business',
+    complexity: CommandComplexity.BUSINESS,
     requiresBusinessData: true,
     description: 'Complete a specific task by number or name',
     examples: ['Complete task 5', 'Finish task number 3', 'Mark task 7 as done'],
@@ -243,7 +243,7 @@ export const DEFAULT_COMMANDS: CommandDefinition[] = [
     triggers: ['auto assign tasks', 'assign tasks automatically', 'smart assign', 'distribute tasks'],
     intent: 'auto_assign_tasks',
     category: 'tasks',
-    complexity: 'business',
+    complexity: CommandComplexity.BUSINESS,
     requiresBusinessData: true,
     description: 'Automatically assign tasks based on skills and workload',
     examples: ['Auto assign new tasks', 'Smart assign tasks to team', 'Distribute tasks automatically'],
@@ -271,7 +271,7 @@ export const DEFAULT_COMMANDS: CommandDefinition[] = [
     triggers: ['task status', 'status of task', 'how is task', 'task progress'],
     intent: 'task_status',
     category: 'status',
-    complexity: 'business',
+    complexity: CommandComplexity.BUSINESS,
     requiresBusinessData: true,
     description: 'Get detailed status of specific task',
     examples: ['Status of task 5', 'How is the foundation task?', 'Task 3 progress'],
@@ -303,7 +303,7 @@ export const DEFAULT_COMMANDS: CommandDefinition[] = [
     triggers: ['generate daily report', 'daily report', 'create daily summary', 'day report'],
     intent: 'daily_report',
     category: 'reports',
-    complexity: 'business',
+    complexity: CommandComplexity.BUSINESS,
     requiresBusinessData: true,
     description: 'Generate comprehensive daily activity and productivity report',
     examples: ['Generate daily report', 'Create today\'s summary', 'Daily productivity report'],
@@ -334,7 +334,7 @@ export const DEFAULT_COMMANDS: CommandDefinition[] = [
     triggers: ['productivity report', 'show productivity', 'productivity analysis', 'efficiency report'],
     intent: 'productivity_report',
     category: 'reports',
-    complexity: 'business',
+    complexity: CommandComplexity.BUSINESS,
     requiresBusinessData: true,
     description: 'Advanced productivity analysis with trends and insights',
     examples: ['Show my productivity', 'Productivity analysis', 'How efficient am I?'],
@@ -364,7 +364,7 @@ export const DEFAULT_COMMANDS: CommandDefinition[] = [
     triggers: ['send message', 'message team', 'tell team', 'notify team', 'broadcast message'],
     intent: 'send_message',
     category: 'communication',
-    complexity: 'business',
+    complexity: CommandComplexity.BUSINESS,
     requiresBusinessData: true,
     description: 'Send message to team or specific person',
     examples: ['Send message to team', 'Tell John about the delay', 'Notify team about meeting'],
@@ -396,7 +396,7 @@ export const DEFAULT_COMMANDS: CommandDefinition[] = [
     triggers: ['report issue', 'problem found', 'there is a problem', 'issue alert', 'report problem'],
     intent: 'report_issue',
     category: 'communication',
-    complexity: 'business',
+    complexity: CommandComplexity.BUSINESS,
     requiresBusinessData: true,
     description: 'Report issue with automatic categorization and routing',
     examples: ['Report safety issue', 'There is equipment problem', 'Issue with foundation'],
@@ -428,7 +428,7 @@ export const DEFAULT_COMMANDS: CommandDefinition[] = [
     triggers: ['get status', 'my status', 'current status', 'work status', 'show status'],
     intent: 'get_status',
     category: 'status',
-    complexity: 'business',
+    complexity: CommandComplexity.BUSINESS,
     requiresBusinessData: true,
     description: 'Get comprehensive work status with insights',
     examples: ['What\'s my status?', 'Show current status', 'Work status update'],
@@ -457,7 +457,7 @@ export const DEFAULT_COMMANDS: CommandDefinition[] = [
     triggers: ['project status', 'project progress', 'how is project', 'project update'],
     intent: 'project_status',
     category: 'status',
-    complexity: 'business',
+    complexity: CommandComplexity.BUSINESS,
     requiresBusinessData: true,
     description: 'Get detailed project status with timeline and progress',
     examples: ['How is the downtown project?', 'Project status update', 'Show project progress'],
@@ -486,7 +486,7 @@ export const DEFAULT_COMMANDS: CommandDefinition[] = [
     triggers: ['team status', 'how is my team', 'team update', 'team progress'],
     intent: 'team_status',
     category: 'status',
-    complexity: 'business',
+    complexity: CommandComplexity.BUSINESS,
     requiresBusinessData: true,
     description: 'Get team status with availability and performance',
     examples: ['How is my team doing?', 'Team status update', 'Show team progress'],
@@ -516,7 +516,7 @@ export const DEFAULT_COMMANDS: CommandDefinition[] = [
     triggers: ['show commands', 'list commands', 'what commands', 'available commands', 'voice commands'],
     intent: 'commands_list',
     category: 'help',
-    complexity: 'simple',
+    complexity: CommandComplexity.SIMPLE,
     requiresBusinessData: false,
     description: 'Show all available voice commands by category',
     examples: ['Show all commands', 'What commands are available?', 'List voice commands'],
@@ -539,7 +539,7 @@ export const DEFAULT_COMMANDS: CommandDefinition[] = [
     triggers: ['voice tips', 'how to use voice', 'voice help', 'voice guide'],
     intent: 'voice_tips',
     category: 'help',
-    complexity: 'simple',
+    complexity: CommandComplexity.SIMPLE,
     requiresBusinessData: false,
     description: 'Get tips for effective voice usage',
     examples: ['Voice tips', 'How to use voice commands?', 'Voice usage guide'],
@@ -611,6 +611,6 @@ export function getSimpleCommands(): CommandDefinition[] {
   return DEFAULT_COMMANDS.filter(cmd => cmd.requiresBusinessData === false);
 }
 
-export function getCommandsByComplexity(complexity: 'simple' | 'business'): CommandDefinition[] {
+export function getCommandsByComplexity(complexity: CommandComplexity.SIMPLE | CommandComplexity.BUSINESS): CommandDefinition[] {
   return DEFAULT_COMMANDS.filter(cmd => cmd.complexity === complexity);
 }

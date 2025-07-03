@@ -169,6 +169,7 @@ export interface CommandAction {
     headers?: Record<string, string>;
     body?: Record<string, any>;
     bodyTemplate?: Record<string, any>;
+    queryParams?: Record<string, any>; // 🔧 FIXED: Added queryParams
     
     // Function Action
     function?: (...args: any[]) => void | Promise<void>;
