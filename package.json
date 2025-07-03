@@ -22,7 +22,7 @@
     "build:react": "cd packages/react && npm run build",
     "build:sequential": "npm run build:types && npm run build:core && npm run build:react",
     "dev": "npm run dev --workspaces",
-    "dev:demo": "npm run build:sequential && cd examples/basic-demo && npm run dev",
+    "dev:demo": "npm run build:sequential && cd examples/three-tier-demo && npm run dev",
     "test": "jest --passWithNoTests",
     "test:watch": "jest --watch --passWithNoTests",
     "test:coverage": "jest --coverage --passWithNoTests",
